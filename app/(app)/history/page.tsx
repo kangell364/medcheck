@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { Patient, Medication, DoseLog } from '@/lib/types'
+import ReportModal from '@/components/ReportModal'
 
 function formatTime(time: string): string {
   const [hourStr, minute] = time.split(':')
@@ -12,6 +13,13 @@ function formatTime(time: string): string {
 export default async function HistoryPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
+
+  // Fetch user profile for display name
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('full_name')
+    .eq('id', user!.id)
+    .single()
 
   const { data: patients } = await supabase
     .from('patients')
@@ -49,11 +57,23 @@ export default async function HistoryPage() {
     return d
   })
 
+  // Data to pass to the report modal
+  const modalPatientData = patientData.map(({ patient, meds }) => ({ patient, meds }))
+
   return (
     <div className="max-w-4xl mx-auto pb-20 md:pb-0">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">Adherence History</h1>
-        <p className="text-gray-500 mt-1">Last 30 days — per medication breakdown</p>
+      <div className="mb-8 flex items-start justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Adherence History</h1>
+          <p className="text-gray-500 mt-1">Last 30 days — per medication breakdown</p>
+        </div>
+        <div className="mt-1">
+          <ReportModal
+            patientData={modalPatientData}
+            userEmail={user!.email ?? ''}
+            userName={profile?.full_name ?? null}
+          />
+        </div>
       </div>
 
       {patientData.length === 0 && (
