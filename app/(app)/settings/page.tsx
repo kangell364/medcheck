@@ -49,10 +49,10 @@ export default async function SettingsPage() {
       <div className="bg-white rounded-2xl border border-gray-100 p-6 mb-6">
         <h2 className="text-lg font-semibold text-gray-900 mb-2">Billing</h2>
         <p className="text-sm text-gray-500 mb-4">
-          MedCheck Free includes up to 1 patient. Upgrade for more patients and call features.
+          RxNudge Free includes up to 1 patient. Upgrade for more patients and call features.
         </p>
         <div className="bg-gradient-to-r from-teal-600 to-emerald-600 rounded-xl p-5 text-white">
-          <h3 className="font-bold text-xl mb-1">MedCheck Pro</h3>
+          <h3 className="font-bold text-xl mb-1">RxNudge Pro</h3>
           <p className="text-teal-100 text-sm mb-3">Unlimited patients • Automated daily calls • SMS alerts</p>
           <p className="text-3xl font-bold mb-4">$19<span className="text-base font-normal text-teal-200">/month</span></p>
           <button className="bg-white text-teal-700 font-semibold py-2.5 px-6 rounded-xl hover:bg-teal-50 transition-colors">

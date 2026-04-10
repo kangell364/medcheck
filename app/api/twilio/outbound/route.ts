@@ -56,7 +56,7 @@ export async function POST(request: NextRequest) {
       process.env.TWILIO_AUTH_TOKEN!
     )
 
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://medcheck.vercel.app'
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://RxNudge.vercel.app'
     const voiceUrl = `${appUrl}/api/twilio/voice?patientId=${patientId}`
     const statusUrl = `${appUrl}/api/twilio/status`
 

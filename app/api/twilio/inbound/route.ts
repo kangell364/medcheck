@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
 
   if (!patient) {
     twiml.say({ voice: 'Polly.Joanna' },
-      'Welcome to MedCheck. We did not find your phone number in our system. Please contact your care coordinator. Goodbye.'
+      'Welcome to RxNudge. We did not find your phone number in our system. Please contact your care coordinator. Goodbye.'
     )
     twiml.hangup()
     return new NextResponse(twiml.toString(), { headers: { 'Content-Type': 'text/xml' } })
@@ -67,7 +67,7 @@ export async function POST(request: NextRequest) {
   }
 
   twiml.say({ voice: 'Polly.Joanna' },
-    `Hello ${firstName}, welcome to MedCheck. ${statusMessage} Thank you for calling. Goodbye!`
+    `Hello ${firstName}, welcome to RxNudge. ${statusMessage} Thank you for calling. Goodbye!`
   )
   twiml.hangup()
 

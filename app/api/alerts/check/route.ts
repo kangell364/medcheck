@@ -29,7 +29,7 @@ export async function POST(request: NextRequest) {
       .eq('patient_id', patientId)
 
     const medName = medication?.name || 'a medication'
-    const message = `⚠️ MedCheck Alert: ${patient.name} missed their ${medName} dose. Please follow up.`
+    const message = `⚠️ RxNudge Alert: ${patient.name} missed their ${medName} dose. Please follow up.`
 
     const client = twilio(
       process.env.TWILIO_ACCOUNT_SID!,
@@ -93,7 +93,7 @@ export async function GET() {
 
   const processed = []
   for (const log of (missedLogs || [])) {
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://medcheck.vercel.app'
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://RxNudge.vercel.app'
     const res = await fetch(`${appUrl}/api/alerts/check`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

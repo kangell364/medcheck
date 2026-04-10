@@ -5,7 +5,7 @@ import './globals.css'
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'MedCheck — Medication Adherence',
+  title: 'RxNudge — Medication Adherence',
   description: 'Track medications and stay on schedule for you or your loved ones.',
 }
 

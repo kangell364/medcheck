@@ -32,7 +32,7 @@ export default function Sidebar() {
               <span className="text-2xl">💊</span>
             </div>
             <div>
-              <h1 className="font-bold text-gray-900 text-lg leading-none">MedCheck</h1>
+              <h1 className="font-bold text-gray-900 text-lg leading-none">RxNudge</h1>
               <p className="text-xs text-gray-400">Medication Tracker</p>
             </div>
           </Link>

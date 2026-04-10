@@ -54,7 +54,7 @@ export async function POST(request: NextRequest) {
 
     if (!confirmed) {
       // Trigger alert for missed dose
-      const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://medcheck.vercel.app'
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://RxNudge.vercel.app'
       await fetch(`${appUrl}/api/alerts/check`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -67,14 +67,14 @@ export async function POST(request: NextRequest) {
 
   // Greeting for first medication
   if (medIndex === 0) {
-    twiml.say({ voice: 'Polly.Joanna' }, `Hello ${firstName}, this is your MedCheck medication reminder.`)
+    twiml.say({ voice: 'Polly.Joanna' }, `Hello ${firstName}, this is your RxNudge medication reminder.`)
     twiml.pause({ length: 1 })
   }
 
   // Ask about current medication
   if (medIndex < meds.length) {
     const med = meds[medIndex]
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://medcheck.vercel.app'
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://RxNudge.vercel.app'
     const nextUrl = `${appUrl}/api/twilio/voice?patientId=${patientId}&medIndex=${medIndex + 1}`
 
     const gather = twiml.gather({

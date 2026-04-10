@@ -8,8 +8,8 @@ export default function OnboardingPage() {
           <div className="inline-flex items-center justify-center w-20 h-20 bg-teal-100 rounded-3xl mb-6">
             <span className="text-4xl">💊</span>
           </div>
-          <h1 className="text-4xl font-bold text-gray-900 mb-3">Welcome to MedCheck!</h1>
-          <p className="text-xl text-gray-500">How will you be using MedCheck?</p>
+          <h1 className="text-4xl font-bold text-gray-900 mb-3">Welcome to RxNudge!</h1>
+          <p className="text-xl text-gray-500">How will you be using RxNudge?</p>
         </div>
 
         <div className="grid md:grid-cols-2 gap-6">

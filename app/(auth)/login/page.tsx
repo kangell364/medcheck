@@ -36,7 +36,7 @@ export default function LoginPage() {
             <span className="text-3xl">💊</span>
           </div>
           <h1 className="text-2xl font-bold text-gray-900">Welcome back</h1>
-          <p className="text-gray-500 mt-1">Sign in to MedCheck</p>
+          <p className="text-gray-500 mt-1">Sign in to RxNudge</p>
         </div>
 
         <form onSubmit={handleLogin} className="space-y-4">
