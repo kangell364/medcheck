@@ -84,11 +84,13 @@ export async function POST(request: NextRequest) {
       timeout: 10,
     })
 
-    const medText = med.dosage ? `${med.name}, ${med.dosage}` : med.name
+    // Use nickname if set — otherwise fall back to medical name
+    const callName = med.nickname || med.name
+    const medText = med.dosage ? `${callName}, ${med.dosage}` : callName
     gather.say({ voice: 'Polly.Joanna' }, `Did you take your ${medText}? Press 1 for yes, or press 2 for no.`)
 
     // If no input, re-ask once
-    twiml.say({ voice: 'Polly.Joanna' }, `Sorry, I didn't catch that. Did you take your ${med.name}? Press 1 for yes or 2 for no.`)
+    twiml.say({ voice: 'Polly.Joanna' }, `Sorry, I didn't catch that. Did you take your ${callName}? Press 1 for yes or 2 for no.`)
     twiml.redirect({ method: 'POST' }, nextUrl)
   } else {
     // All medications asked — wrap up
