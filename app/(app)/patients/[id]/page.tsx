@@ -5,6 +5,14 @@ import { Medication, DoseLog } from '@/lib/types'
 import ManualLogButton from '@/components/ManualLogButton'
 import TriggerCallButton from '@/components/TriggerCallButton'
 
+function formatTime(time: string): string {
+  const [hourStr, minute] = time.split(':')
+  const hour = parseInt(hourStr, 10)
+  const ampm = hour >= 12 ? 'PM' : 'AM'
+  const displayHour = hour % 12 || 12
+  return `${displayHour}:${minute} ${ampm}`
+}
+
 export default async function PatientDetailPage({
   params,
 }: {
@@ -113,12 +121,15 @@ export default async function PatientDetailPage({
                     <div className="flex items-start gap-3">
                       <span className="text-2xl mt-0.5">{config.icon}</span>
                       <div>
-                        <h3 className="font-semibold text-gray-900 text-lg">{med.name}</h3>
-                        {med.dosage && <p className="text-sm text-gray-600">{med.dosage}</p>}
-                        <div className="flex flex-wrap gap-2 mt-1">
+                        <h3 className="font-bold text-gray-900 text-2xl">{med.name}</h3>
+                        {med.nickname && (
+                          <p className="text-base text-teal-600 font-medium">"{med.nickname}"</p>
+                        )}
+                        {med.dosage && <p className="text-base text-gray-600">{med.dosage}</p>}
+                        <div className="flex flex-wrap gap-2 mt-2">
                           {med.reminder_times.map(t => (
-                            <span key={t} className="text-xs bg-white/60 px-2 py-0.5 rounded-full text-gray-600">
-                              {t}
+                            <span key={t} className="text-sm font-semibold bg-white/80 px-3 py-1 rounded-full text-gray-700 border border-gray-200">
+                              🕐 {formatTime(t)}
                             </span>
                           ))}
                         </div>
