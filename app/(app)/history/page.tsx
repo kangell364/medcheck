@@ -1,6 +1,14 @@
 import { createClient } from '@/lib/supabase/server'
 import { Patient, Medication, DoseLog } from '@/lib/types'
 
+function formatTime(time: string): string {
+  const [hourStr, minute] = time.split(':')
+  const hour = parseInt(hourStr, 10)
+  const ampm = hour >= 12 ? 'PM' : 'AM'
+  const displayHour = hour % 12 || 12
+  return `${displayHour}:${minute} ${ampm}`
+}
+
 export default async function HistoryPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -11,7 +19,6 @@ export default async function HistoryPage() {
     .eq('owner_id', user!.id)
     .eq('active', true) as { data: Patient[] | null }
 
-  // Get last 30 days
   const thirtyDaysAgo = new Date()
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
 
@@ -34,7 +41,7 @@ export default async function HistoryPage() {
     })
   )
 
-  // Build 30-day calendar
+  // Build 30-day array
   const days = Array.from({ length: 30 }, (_, i) => {
     const d = new Date()
     d.setDate(d.getDate() - (29 - i))
@@ -46,105 +53,147 @@ export default async function HistoryPage() {
     <div className="max-w-4xl mx-auto pb-20 md:pb-0">
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900">Adherence History</h1>
-        <p className="text-gray-500 mt-1">Last 30 days of medication tracking</p>
+        <p className="text-gray-500 mt-1">Last 30 days — per medication breakdown</p>
       </div>
 
       {patientData.length === 0 && (
         <div className="bg-white rounded-2xl border-2 border-dashed border-gray-200 p-12 text-center">
           <div className="text-5xl mb-4">📅</div>
           <h2 className="text-xl font-semibold text-gray-900 mb-2">No history yet</h2>
-          <p className="text-gray-500">Add patients and medications to see your adherence history.</p>
+          <p className="text-gray-500">Add patients and medications to start tracking.</p>
         </div>
       )}
 
       {patientData.map(({ patient, meds, logs }) => {
+        // Overall adherence across all meds
         const totalPossible = days.length * meds.length
-        const confirmed = logs.filter(l => l.confirmed === true).length
-        const overallPct = totalPossible > 0 ? Math.round((confirmed / totalPossible) * 100) : 0
+        const totalConfirmed = logs.filter(l => l.confirmed === true).length
+        const overallPct = totalPossible > 0 ? Math.round((totalConfirmed / totalPossible) * 100) : 0
 
         return (
           <div key={patient.id} className="bg-white rounded-2xl border border-gray-100 p-6 mb-6">
+
+            {/* Patient header */}
             <div className="flex items-start justify-between mb-6">
               <div>
-                <h2 className="text-xl font-bold text-gray-900">{patient.name}</h2>
+                <h2 className="text-2xl font-bold text-gray-900">{patient.name}</h2>
                 <p className="text-sm text-gray-500">{meds.length} medication{meds.length !== 1 ? 's' : ''}</p>
               </div>
               <div className="text-right">
-                <span className="text-3xl font-bold text-teal-600">{overallPct}%</span>
-                <p className="text-xs text-gray-400">30-day adherence</p>
+                <span className={`text-3xl font-bold ${overallPct >= 80 ? 'text-teal-600' : overallPct >= 50 ? 'text-amber-500' : 'text-red-500'}`}>
+                  {overallPct}%
+                </span>
+                <p className="text-xs text-gray-400">overall 30-day</p>
               </div>
             </div>
 
-            {/* Calendar heatmap */}
+            {/* Legend */}
+            <div className="flex gap-4 mb-6 text-xs text-gray-500">
+              <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded bg-emerald-500" /> Taken</div>
+              <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded bg-red-400" /> Missed</div>
+              <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded bg-gray-100 border border-gray-200" /> No data</div>
+            </div>
+
+            {/* Date header row */}
             <div className="overflow-x-auto">
-              <div className="flex gap-1.5 min-w-max">
-                {days.map((day, dayIdx) => {
-                  const nextDay = new Date(day)
-                  nextDay.setDate(nextDay.getDate() + 1)
-                  const dayLogs = logs.filter(l => {
-                    const d = new Date(l.scheduled_at)
-                    return d >= day && d < nextDay
-                  })
-                  const dayConfirmed = dayLogs.filter(l => l.confirmed === true).length
-                  const dayTotal = meds.length
-                  const pct = dayTotal > 0 ? dayConfirmed / dayTotal : 0
+              <div className="min-w-max">
 
-                  let bg = 'bg-gray-100'
-                  if (dayTotal > 0 && dayLogs.length === 0) bg = 'bg-gray-100'
-                  else if (pct === 1) bg = 'bg-emerald-500'
-                  else if (pct >= 0.5) bg = 'bg-emerald-300'
-                  else if (pct > 0) bg = 'bg-amber-300'
-                  else if (dayLogs.length > 0) bg = 'bg-red-400'
-
-                  const isToday = dayIdx === 29
-
-                  return (
-                    <div key={dayIdx} className="flex flex-col items-center gap-1">
-                      <div
-                        className={`w-7 h-7 rounded-md ${bg} ${isToday ? 'ring-2 ring-teal-500 ring-offset-1' : ''}`}
-                        title={`${day.toLocaleDateString()}: ${dayConfirmed}/${dayTotal}`}
-                      />
-                      {(dayIdx % 7 === 0 || dayIdx === 29) && (
+                {/* Date labels */}
+                <div className="flex items-center mb-2 pl-48">
+                  {days.map((day, i) => (
+                    <div key={i} className="w-7 shrink-0 text-center">
+                      {(i % 7 === 0 || i === 29) && (
                         <span className="text-xs text-gray-400">
                           {day.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                         </span>
                       )}
                     </div>
-                  )
-                })}
-              </div>
-            </div>
+                  ))}
+                </div>
 
-            <div className="flex gap-4 mt-4 text-xs text-gray-500">
-              <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded bg-emerald-500" /> All taken</div>
-              <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded bg-emerald-300" /> Partial</div>
-              <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded bg-red-400" /> Missed</div>
-              <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded bg-gray-100" /> No data</div>
-            </div>
+                {/* No medications message */}
+                {meds.length === 0 && (
+                  <div className="text-center py-6 text-gray-400 text-sm">
+                    No medications added yet.
+                  </div>
+                )}
 
-            {/* Per-medication breakdown */}
-            {meds.length > 0 && (
-              <div className="mt-6 space-y-3">
-                <h3 className="text-sm font-semibold text-gray-700">Per Medication</h3>
-                {meds.map(med => {
+                {/* One row per medication */}
+                {meds.map((med, medIdx) => {
                   const medLogs = logs.filter(l => l.medication_id === med.id)
                   const medConfirmed = medLogs.filter(l => l.confirmed === true).length
+                  const medMissed = medLogs.filter(l => l.confirmed === false).length
                   const medPct = days.length > 0 ? Math.round((medConfirmed / days.length) * 100) : 0
+                  const displayName = (med as any).nickname || med.name
+
                   return (
-                    <div key={med.id} className="flex items-center gap-3">
-                      <span className="text-sm text-gray-700 flex-1">{med.name}</span>
-                      <div className="flex-1 bg-gray-100 rounded-full h-2">
-                        <div
-                          className="bg-teal-500 h-2 rounded-full"
-                          style={{ width: `${medPct}%` }}
-                        />
+                    <div
+                      key={med.id}
+                      className={`flex items-center gap-1 mb-3 ${medIdx < meds.length - 1 ? 'pb-3 border-b border-gray-50' : ''}`}
+                    >
+                      {/* Medication label */}
+                      <div className="w-48 shrink-0 pr-3">
+                        <p className="text-sm font-semibold text-gray-800 truncate">{displayName}</p>
+                        {(med as any).nickname && (
+                          <p className="text-xs text-gray-400 truncate">{med.name}</p>
+                        )}
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <span className={`text-xs font-bold ${medPct >= 80 ? 'text-teal-600' : medPct >= 50 ? 'text-amber-500' : 'text-red-500'}`}>
+                            {medPct}%
+                          </span>
+                          {medMissed > 0 && (
+                            <span className="text-xs text-red-400">{medMissed} missed</span>
+                          )}
+                        </div>
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {med.reminder_times.map(t => (
+                            <span key={t} className="text-xs text-gray-400">{formatTime(t)}</span>
+                          ))}
+                        </div>
                       </div>
-                      <span className="text-sm font-medium text-gray-700 w-10 text-right">{medPct}%</span>
+
+                      {/* Day squares */}
+                      {days.map((day, dayIdx) => {
+                        const nextDay = new Date(day)
+                        nextDay.setDate(nextDay.getDate() + 1)
+                        const dayLog = medLogs.find(l => {
+                          const d = new Date(l.scheduled_at)
+                          return d >= day && d < nextDay
+                        })
+
+                        let bg = 'bg-gray-100 border border-gray-200'
+                        let title = `${day.toLocaleDateString()} — No data`
+
+                        if (dayLog) {
+                          if (dayLog.confirmed === true) {
+                            bg = 'bg-emerald-500'
+                            title = `${day.toLocaleDateString()} — ✅ Taken`
+                            if (dayLog.confirmed_at) {
+                              title += ` at ${new Date(dayLog.confirmed_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+                            }
+                          } else if (dayLog.confirmed === false) {
+                            bg = 'bg-red-400'
+                            title = `${day.toLocaleDateString()} — ❌ Missed`
+                          }
+                        }
+
+                        const isToday = dayIdx === 29
+
+                        return (
+                          <div
+                            key={dayIdx}
+                            className={`w-7 h-7 shrink-0 rounded-md ${bg} ${isToday ? 'ring-2 ring-teal-500 ring-offset-1' : ''} cursor-pointer`}
+                            title={title}
+                          />
+                        )
+                      })}
                     </div>
                   )
                 })}
+
               </div>
-            )}
+            </div>
+
           </div>
         )
       })}
