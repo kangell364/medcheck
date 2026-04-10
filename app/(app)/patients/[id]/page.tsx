@@ -6,11 +6,23 @@ import ManualLogButton from '@/components/ManualLogButton'
 import TriggerCallButton from '@/components/TriggerCallButton'
 
 function formatTime(time: string): string {
-  const [hourStr, minute] = time.split(':')
+  const [hourStr, minuteStr] = time.split(':')
   const hour = parseInt(hourStr, 10)
+  const minute = parseInt(minuteStr, 10)
   const ampm = hour >= 12 ? 'PM' : 'AM'
   const displayHour = hour % 12 || 12
-  return `${displayHour}:${minute} ${ampm}`
+  const displayMinute = minute === 0 ? '00' : minuteStr.padStart(2, '0')
+  return `${displayHour}:${displayMinute} ${ampm}`
+}
+
+function formatCallbackTime(isoString: string): string {
+  const date = new Date(isoString)
+  let hours = date.getHours()
+  const minutes = date.getMinutes()
+  const ampm = hours >= 12 ? 'PM' : 'AM'
+  hours = hours % 12 || 12
+  const minStr = minutes === 0 ? '00' : minutes.toString().padStart(2, '0')
+  return `${hours}:${minStr} ${ampm}`
 }
 
 export default async function PatientDetailPage({
@@ -48,25 +60,40 @@ export default async function PatientDetailPage({
     .select('*')
     .eq('patient_id', id)
     .gte('scheduled_at', today.toISOString())
-    .lt('scheduled_at', tomorrow.toISOString()) as { data: DoseLog[] | null }
+    .lt('scheduled_at', tomorrow.toISOString()) as { data: (DoseLog & { snooze_until?: string | null })[] | null }
 
   const { data: alerts } = await supabase
     .from('patient_alerts')
     .select('*')
     .eq('patient_id', id)
 
+  // Fetch pending callbacks
+  const { data: pendingCallbacks } = await supabase
+    .from('callbacks')
+    .select('*')
+    .eq('patient_id', id)
+    .eq('fulfilled', false)
+    .gte('scheduled_for', new Date().toISOString())
+
   const getMedStatus = (medId: string) => {
     const log = (todayLogs || []).find(l => l.medication_id === medId)
     if (!log) return 'pending'
+    // Check if snoozed and snooze still active
+    if (log.snooze_until && new Date(log.snooze_until) > new Date()) return 'snoozed'
     if (log.confirmed === true) return 'confirmed'
     if (log.confirmed === false) return 'missed'
     return 'pending'
+  }
+
+  const getPendingCallback = (medId: string) => {
+    return (pendingCallbacks || []).find(cb => cb.medication_id === medId) || null
   }
 
   const statusConfig = {
     confirmed: { icon: '✅', label: 'Taken', class: 'bg-emerald-50 border-emerald-200 text-emerald-700' },
     missed: { icon: '❌', label: 'Missed', class: 'bg-red-50 border-red-200 text-red-700' },
     pending: { icon: '⏳', label: 'Pending', class: 'bg-amber-50 border-amber-200 text-amber-700' },
+    snoozed: { icon: '😴', label: 'Snoozed', class: 'bg-amber-50 border-amber-200 text-amber-700' },
   }
 
   return (
@@ -124,6 +151,8 @@ export default async function PatientDetailPage({
               const status = getMedStatus(med.id)
               const config = statusConfig[status]
               const log = (todayLogs || []).find(l => l.medication_id === med.id)
+              const pendingCallback = getPendingCallback(med.id)
+              const scheduledAtStr = today.toISOString()
 
               return (
                 <div key={med.id} className={`bg-white rounded-2xl border-2 p-5 ${config.class}`}>
@@ -132,8 +161,8 @@ export default async function PatientDetailPage({
                       <span className="text-2xl mt-0.5">{config.icon}</span>
                       <div>
                         <h3 className="font-bold text-gray-900 text-2xl">{med.name}</h3>
-                        {med.nickname && (
-                          <p className="text-base text-teal-600 font-medium">"{med.nickname}"</p>
+                        {(med as any).nickname && (
+                          <p className="text-base text-teal-600 font-medium">&quot;{(med as any).nickname}&quot;</p>
                         )}
                         {med.dosage && <p className="text-base text-gray-600">{med.dosage}</p>}
                         <div className="flex flex-wrap gap-2 mt-2">
@@ -143,8 +172,11 @@ export default async function PatientDetailPage({
                             </span>
                           ))}
                         </div>
-                        {(med as any).nickname && (
-                          <p className="text-sm text-teal-600 mt-1">Called: &quot;{(med as any).nickname}&quot;</p>
+                        {/* Callback badge */}
+                        {pendingCallback && (
+                          <span className="inline-flex items-center gap-1 mt-2 text-xs font-semibold bg-orange-100 text-orange-700 px-2.5 py-1 rounded-full border border-orange-200">
+                            📞 Callback at {formatCallbackTime(pendingCallback.scheduled_for)}
+                          </span>
                         )}
                       </div>
                     </div>
@@ -157,11 +189,13 @@ export default async function PatientDetailPage({
                           medicationId={med.id}
                           patientId={patient.id}
                           medicationName={med.name}
+                          scheduledAt={scheduledAtStr}
+                          snoozeUntil={log?.snooze_until ?? null}
                         />
                       )}
                     </div>
                   </div>
-                  {log?.confirmed_at && (
+                  {log?.confirmed_at && status !== 'snoozed' && (
                     <p className="text-xs text-gray-400 mt-2 ml-9">
                       {status === 'confirmed' ? 'Confirmed' : 'Recorded'} at {new Date(log.confirmed_at).toLocaleTimeString()}
                       {log.method && ` via ${log.method}`}

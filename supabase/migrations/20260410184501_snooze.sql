@@ -1,0 +1,1 @@
+ALTER TABLE dose_logs ADD COLUMN IF NOT EXISTS snooze_until TIMESTAMPTZ;

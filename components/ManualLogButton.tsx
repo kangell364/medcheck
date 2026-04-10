@@ -3,29 +3,55 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import SnoozeButton from './SnoozeButton'
 
 interface Props {
   medicationId: string
   patientId: string
   medicationName: string
+  scheduledAt?: string
+  snoozeUntil?: string | null
 }
 
-export default function ManualLogButton({ medicationId, patientId, medicationName }: Props) {
+function formatSnoozeTime(isoString: string): string {
+  const date = new Date(isoString)
+  let hours = date.getHours()
+  const minutes = date.getMinutes()
+  const ampm = hours >= 12 ? 'PM' : 'AM'
+  hours = hours % 12 || 12
+  const minStr = minutes === 0 ? '00' : minutes.toString().padStart(2, '0')
+  return `${hours}:${minStr} ${ampm}`
+}
+
+export default function ManualLogButton({
+  medicationId,
+  patientId,
+  medicationName,
+  scheduledAt,
+  snoozeUntil: initialSnoozeUntil,
+}: Props) {
   const [loading, setLoading] = useState(false)
+  const [snoozeUntil, setSnoozeUntil] = useState<string | null>(initialSnoozeUntil ?? null)
   const router = useRouter()
   const supabase = createClient()
+
+  const scheduledAtStr = scheduledAt || (() => {
+    const d = new Date()
+    d.setHours(0, 0, 0, 0)
+    return d.toISOString()
+  })()
+
+  // Check if snooze is still active
+  const isSnoozed = snoozeUntil !== null && new Date(snoozeUntil) > new Date()
 
   async function logDose(confirmed: boolean) {
     setLoading(true)
     const now = new Date()
-    // Set scheduled_at to start of today
-    const scheduledAt = new Date()
-    scheduledAt.setHours(0, 0, 0, 0)
 
     await supabase.from('dose_logs').upsert({
       patient_id: patientId,
       medication_id: medicationId,
-      scheduled_at: scheduledAt.toISOString(),
+      scheduled_at: scheduledAtStr,
       confirmed,
       confirmed_at: now.toISOString(),
       method: 'app',
@@ -37,24 +63,46 @@ export default function ManualLogButton({ medicationId, patientId, medicationNam
     setLoading(false)
   }
 
+  function handleSnooze(snoozeUntilTimestamp: string) {
+    setSnoozeUntil(snoozeUntilTimestamp)
+  }
+
+  if (isSnoozed) {
+    return (
+      <div className="flex items-center">
+        <span className="text-xs font-semibold bg-amber-100 text-amber-700 px-3 py-1.5 rounded-lg border border-amber-200">
+          😴 Snoozed until {formatSnoozeTime(snoozeUntil!)}
+        </span>
+      </div>
+    )
+  }
+
   return (
-    <div className="flex gap-1">
-      <button
-        onClick={() => logDose(true)}
-        disabled={loading}
-        className="text-xs bg-emerald-100 hover:bg-emerald-200 text-emerald-700 font-medium py-1.5 px-3 rounded-lg transition-colors disabled:opacity-50"
-        title={`Mark ${medicationName} as taken`}
-      >
-        ✓ Taken
-      </button>
-      <button
-        onClick={() => logDose(false)}
-        disabled={loading}
-        className="text-xs bg-red-100 hover:bg-red-200 text-red-700 font-medium py-1.5 px-3 rounded-lg transition-colors disabled:opacity-50"
-        title={`Mark ${medicationName} as missed`}
-      >
-        ✗ Skip
-      </button>
+    <div className="flex flex-col gap-1.5 items-end">
+      <div className="flex gap-1">
+        <button
+          onClick={() => logDose(true)}
+          disabled={loading}
+          className="text-xs bg-emerald-100 hover:bg-emerald-200 text-emerald-700 font-medium py-1.5 px-3 rounded-lg transition-colors disabled:opacity-50"
+          title={`Mark ${medicationName} as taken`}
+        >
+          ✓ Taken
+        </button>
+        <button
+          onClick={() => logDose(false)}
+          disabled={loading}
+          className="text-xs bg-red-100 hover:bg-red-200 text-red-700 font-medium py-1.5 px-3 rounded-lg transition-colors disabled:opacity-50"
+          title={`Mark ${medicationName} as missed`}
+        >
+          ✗ Skip
+        </button>
+      </div>
+      <SnoozeButton
+        patientId={patientId}
+        medicationId={medicationId}
+        scheduledAt={scheduledAtStr}
+        onSnooze={handleSnooze}
+      />
     </div>
   )
 }

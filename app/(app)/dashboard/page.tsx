@@ -2,6 +2,17 @@ import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
 import { Patient, Medication, DoseLog } from '@/lib/types'
 
+function formatApptDateTime(dateStr: string, timeStr: string): string {
+  const dt = new Date(`${dateStr}T${timeStr}`)
+  const date = dt.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+  let hours = dt.getHours()
+  const minutes = dt.getMinutes()
+  const ampm = hours >= 12 ? 'PM' : 'AM'
+  hours = hours % 12 || 12
+  const minStr = minutes === 0 ? '00' : minutes.toString().padStart(2, '0')
+  return `${date} at ${hours}:${minStr} ${ampm}`
+}
+
 function getGreeting() {
   const hour = new Date().getHours()
   if (hour < 12) return 'Good morning'
@@ -61,6 +72,16 @@ export default async function DashboardPage() {
     .in('patient_id', (patients || []).map(p => p.id))
     .order('sent_at', { ascending: false })
     .limit(5)
+
+  const { data: upcomingAppointments } = await supabase
+    .from('appointments')
+    .select('*, patients(id, name)')
+    .eq('owner_id', user!.id)
+    .eq('status', 'upcoming')
+    .gte('appointment_date', today.toISOString().split('T')[0])
+    .order('appointment_date', { ascending: true })
+    .order('appointment_time', { ascending: true })
+    .limit(3)
 
   const displayName = profile?.full_name?.split(' ')[0] || 'there'
   const dateStr = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
@@ -160,6 +181,32 @@ export default async function DashboardPage() {
           >
             <span>🔔</span> Alert Log
           </Link>
+        </div>
+      )}
+
+      {/* Upcoming Appointments */}
+      {upcomingAppointments && upcomingAppointments.length > 0 && (
+        <div className="mt-8">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold text-gray-900">Upcoming Appointments</h2>
+            <Link href="/appointments" className="text-sm text-teal-600 hover:underline">View all</Link>
+          </div>
+          <div className="bg-white rounded-2xl border border-gray-100 divide-y divide-gray-100">
+            {upcomingAppointments.map((appt: any) => (
+              <div key={appt.id} className="px-5 py-4 flex items-start gap-3">
+                <span className="text-xl mt-0.5">📆</span>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-semibold text-gray-800">Dr. {appt.doctor_name}</p>
+                    {appt.needs_ride && <span className="text-sm" title="Needs ride">🚗</span>}
+                  </div>
+                  <p className="text-xs text-gray-500">
+                    {(appt.patients as any)?.name} • {formatApptDateTime(appt.appointment_date, appt.appointment_time)}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
