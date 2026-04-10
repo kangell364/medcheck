@@ -80,7 +80,17 @@ export default async function PatientDetailPage({
             <h1 className="text-3xl font-bold text-gray-900">{patient.name}</h1>
             <p className="text-gray-500">{patient.phone} • {patient.timezone}</p>
           </div>
-          <TriggerCallButton patientId={patient.id} patientName={patient.name} />
+          <TriggerCallButton
+            patientId={patient.id}
+            patientName={patient.name}
+            medications={(medications || []).map(m => ({
+              id: m.id,
+              name: m.name,
+              nickname: (m as any).nickname,
+              reminder_times: m.reminder_times,
+            }))}
+            timezone={patient.timezone}
+          />
         </div>
       </div>
 
@@ -133,6 +143,9 @@ export default async function PatientDetailPage({
                             </span>
                           ))}
                         </div>
+                        {(med as any).nickname && (
+                          <p className="text-sm text-teal-600 mt-1">Called: &quot;{(med as any).nickname}&quot;</p>
+                        )}
                       </div>
                     </div>
                     <div className="flex flex-col items-end gap-2">
