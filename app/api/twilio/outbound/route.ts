@@ -48,6 +48,7 @@ export async function POST(request: NextRequest) {
       await supabase.from('dose_logs').upsert({
         patient_id: patientId,
         medication_id: med.id,
+        medication_name: med.name,
         scheduled_at: scheduledAt.toISOString(),
         confirmed: null,
         method: 'call',

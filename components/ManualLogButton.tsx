@@ -51,6 +51,7 @@ export default function ManualLogButton({
     await supabase.from('dose_logs').upsert({
       patient_id: patientId,
       medication_id: medicationId,
+      medication_name: medicationName,
       scheduled_at: scheduledAtStr,
       confirmed,
       confirmed_at: now.toISOString(),

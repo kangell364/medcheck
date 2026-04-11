@@ -12,12 +12,20 @@ export async function POST(request: NextRequest) {
 
     const supabase = createAdminClient()
 
+    // Fetch medication name for snapshot
+    const { data: medication } = await supabase
+      .from('medications')
+      .select('name')
+      .eq('id', medicationId)
+      .single()
+
     const snoozeUntil = new Date(Date.now() + hours * 60 * 60 * 1000)
 
     const { error } = await supabase.from('dose_logs').upsert(
       {
         patient_id: patientId,
         medication_id: medicationId,
+        medication_name: medication?.name ?? null,
         scheduled_at: scheduledAt,
         confirmed: null,
         method: 'snooze',

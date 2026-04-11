@@ -151,6 +151,7 @@ export async function POST(request: NextRequest) {
         {
           patient_id: patientId,
           medication_id: currentMed.id,
+          medication_name: currentMed.name,
           scheduled_at: scheduledAt.toISOString(),
           confirmed: true,
           confirmed_at: new Date().toISOString(),
@@ -197,6 +198,7 @@ export async function POST(request: NextRequest) {
         {
           patient_id: patientId,
           medication_id: currentMed.id,
+          medication_name: currentMed.name,
           scheduled_at: scheduledAt.toISOString(),
           confirmed: null,
           confirmed_at: new Date().toISOString(),

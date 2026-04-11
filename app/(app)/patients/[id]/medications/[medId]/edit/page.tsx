@@ -125,13 +125,21 @@ export default function EditMedicationPage() {
         <p className="text-gray-500 mt-1">Update medication details and reminder times</p>
       </div>
 
+      {/* Info box */}
+      <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 mb-4 flex gap-2 items-start">
+        <span className="text-amber-500 text-base mt-0.5">ℹ️</span>
+        <p className="text-sm text-amber-800">
+          Changing the medication name won&apos;t affect past history — old records will continue to show the previous name.
+        </p>
+      </div>
+
       <div className="bg-white rounded-2xl border border-gray-100 p-6">
         <form onSubmit={handleSubmit} className="space-y-5">
 
           {/* Medication Name */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Medication Name *
+              Medication Name (Official) *
             </label>
             <input
               type="text"
@@ -141,12 +149,15 @@ export default function EditMedicationPage() {
               className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-teal-500 text-lg"
               placeholder="e.g. Lisinopril"
             />
+            <p className="text-xs text-gray-400 mt-1">
+              Use the official drug name — this appears on reports and PDFs sent to doctors.
+            </p>
           </div>
 
           {/* Nickname */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Nickname <span className="text-gray-400 font-normal">(optional)</span>
+              Nickname (Optional)
             </label>
             <input
               type="text"
@@ -156,7 +167,7 @@ export default function EditMedicationPage() {
               placeholder="e.g. blood pressure pill, water pill, heart med"
             />
             <p className="text-xs text-gray-400 mt-1">
-              💬 If set, the AI call will use this name instead of the medical name — easier for patients to understand.
+              A friendly name used in phone calls and reminders. E.g. &apos;heart pill&apos;, &apos;little white one&apos;.
             </p>
 
             {/* Live preview */}

@@ -84,12 +84,7 @@ export default async function HistoryPage() {
 
   const patientData = await Promise.all(
     (patients || []).map(async (patient) => {
-      const { data: meds } = await supabase
-        .from('medications')
-        .select('*')
-        .eq('patient_id', patient.id)
-        .eq('active', true) as { data: Medication[] | null }
-
+      // Fetch logs in the 30-day window first
       const { data: logs } = await supabase
         .from('dose_logs')
         .select('*')
@@ -97,7 +92,22 @@ export default async function HistoryPage() {
         .gte('scheduled_at', thirtyDaysAgo.toISOString())
         .order('scheduled_at', { ascending: false }) as { data: DoseLog[] | null }
 
-      return { patient, meds: meds || [], logs: logs || [] }
+      const allLogs = logs || []
+
+      // Fetch ALL medications (active AND inactive) — then filter to only those
+      // that are either active OR have at least one dose_log in the 30-day window
+      const { data: allMeds } = await supabase
+        .from('medications')
+        .select('*')
+        .eq('patient_id', patient.id) as { data: Medication[] | null }
+
+      const loggedMedIds = new Set(allLogs.map(l => l.medication_id))
+
+      const meds = (allMeds || []).filter(
+        med => med.active || loggedMedIds.has(med.id)
+      )
+
+      return { patient, meds, logs: allLogs }
     })
   )
 
@@ -256,8 +266,14 @@ export default async function HistoryPage() {
 
                 {/* One grouped block per medication */}
                 {meds.map((med, medIdx) => {
+                  const isInactive = !med.active
+                  // Use nickname for display, fall back to official name
                   const displayName = (med as any).nickname || med.name
                   const times = med.reminder_times.length > 0 ? med.reminder_times : ['00:00']
+
+                  // For inactive meds: derive a display name from snapshotted logs if available
+                  const logsForThisMed = logs.filter(l => l.medication_id === med.id)
+                  const snapshotName = logsForThisMed.find(l => l.medication_name)?.medication_name ?? null
 
                   // Per-med adherence: count taken across all time slots
                   const medTotalSlots = times.length * days.length
@@ -273,10 +289,13 @@ export default async function HistoryPage() {
 
                   const isLastMed = medIdx === meds.length - 1
 
+                  // Label used for display (prefer snapshot for inactive, otherwise display name)
+                  const headingName = isInactive ? (snapshotName || displayName) : displayName
+
                   return (
                     <div
                       key={med.id}
-                      className={`${!isLastMed ? 'mb-4 pb-4 border-b border-gray-100' : 'mb-2'}`}
+                      className={`${!isLastMed ? 'mb-4 pb-4 border-b border-gray-100' : 'mb-2'} ${isInactive ? 'opacity-60' : ''}`}
                     >
                       {times.map((rt, timeIdx) => {
                         const isFirstTime = timeIdx === 0
@@ -289,16 +308,24 @@ export default async function HistoryPage() {
                             <div className="w-44 shrink-0 sticky left-0 z-10 bg-white self-stretch flex flex-col justify-center pr-2">
                               {isFirstTime ? (
                                 <>
-                                  <p className="text-sm font-semibold text-gray-800 truncate leading-tight">{displayName}</p>
-                                  {(med as any).nickname && (
+                                  <p className={`text-sm font-semibold truncate leading-tight ${isInactive ? 'line-through text-gray-400' : 'text-gray-800'}`}>
+                                    {headingName}
+                                  </p>
+                                  {(med as any).nickname && !isInactive && (
                                     <p className="text-xs text-gray-400 truncate">{med.name}</p>
                                   )}
                                   <div className="flex items-center gap-2 mt-0.5">
-                                    <span className={`text-xs font-bold ${medPct >= 80 ? 'text-teal-600' : medPct >= 50 ? 'text-amber-500' : 'text-red-500'}`}>
-                                      {medPct}%
-                                    </span>
-                                    {medMissed > 0 && (
-                                      <span className="text-xs text-red-400">{medMissed} missed</span>
+                                    {isInactive ? (
+                                      <span className="text-xs text-gray-400 font-medium">archived</span>
+                                    ) : (
+                                      <>
+                                        <span className={`text-xs font-bold ${medPct >= 80 ? 'text-teal-600' : medPct >= 50 ? 'text-amber-500' : 'text-red-500'}`}>
+                                          {medPct}%
+                                        </span>
+                                        {medMissed > 0 && (
+                                          <span className="text-xs text-red-400">{medMissed} missed</span>
+                                        )}
+                                      </>
                                     )}
                                   </div>
                                 </>
@@ -320,18 +347,20 @@ export default async function HistoryPage() {
                               const log = byDate[dateStr]
 
                               let bg = 'bg-gray-100 border border-gray-200'
+                              // Use snapshotted medication_name if available, else fall back to official name
+                              const logMedName = log?.medication_name || med.name
                               let title = `${days[dayIdx].toLocaleDateString()} ${formatTime(rt)} — No data`
 
                               if (log) {
                                 if (log.confirmed === true) {
                                   bg = 'bg-emerald-500'
-                                  title = `${days[dayIdx].toLocaleDateString()} ${formatTime(rt)} — ✅ Taken`
+                                  title = `${days[dayIdx].toLocaleDateString()} ${formatTime(rt)} — ✅ Taken (${logMedName})`
                                   if (log.confirmed_at) {
                                     title += ` at ${new Date(log.confirmed_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
                                   }
                                 } else if (log.confirmed === false) {
                                   bg = 'bg-red-400'
-                                  title = `${days[dayIdx].toLocaleDateString()} ${formatTime(rt)} — ❌ Missed`
+                                  title = `${days[dayIdx].toLocaleDateString()} ${formatTime(rt)} — ❌ Missed (${logMedName})`
                                 }
                               }
 

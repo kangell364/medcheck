@@ -90,6 +90,21 @@ export async function DELETE(
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
+  // Read keepHistory query param (default true)
+  const keepHistory = req.nextUrl.searchParams.get('keepHistory') !== 'false'
+
+  // If NOT keeping history: delete all dose_logs for this medication first
+  if (!keepHistory) {
+    const { error: logsError } = await supabase
+      .from('dose_logs')
+      .delete()
+      .eq('medication_id', medId)
+
+    if (logsError) {
+      return NextResponse.json({ error: logsError.message }, { status: 500 })
+    }
+  }
+
   // Soft-delete by setting active = false
   const { error } = await supabase
     .from('medications')

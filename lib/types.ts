@@ -35,6 +35,7 @@ export interface DoseLog {
   id: string
   patient_id: string
   medication_id: string
+  medication_name: string | null
   scheduled_at: string
   confirmed: boolean | null
   confirmed_at: string | null

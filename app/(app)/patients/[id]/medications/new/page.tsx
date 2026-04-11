@@ -168,7 +168,7 @@ export default function NewMedicationPage() {
           {/* Medication Name with RxNorm Autocomplete */}
           <div className="relative" ref={suggestionsRef}>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Medication Name *
+              Medication Name (Official) *
             </label>
             <div className="relative">
               <input
@@ -206,12 +206,15 @@ export default function NewMedicationPage() {
                 </div>
               </div>
             )}
+            <p className="text-xs text-gray-400 mt-1">
+              Use the official drug name — this appears on reports and PDFs sent to doctors.
+            </p>
           </div>
 
           {/* Nickname / Plain Language Name */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Nickname <span className="text-gray-400 font-normal">(optional)</span>
+              Nickname (Optional)
             </label>
             <input
               type="text"
@@ -221,7 +224,7 @@ export default function NewMedicationPage() {
               placeholder="e.g. blood pressure pill, water pill, heart med"
             />
             <p className="text-xs text-gray-400 mt-1">
-              💬 If set, the AI call will use this name instead of the medical name — easier for patients to understand.
+              A friendly name used in phone calls and reminders. E.g. &apos;heart pill&apos;, &apos;little white one&apos;.
             </p>
 
             {/* Live preview */}
