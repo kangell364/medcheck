@@ -4,12 +4,24 @@ import { useState } from 'react'
 import { Medication, DoseLog, Patient } from '@/lib/types'
 import { createClient } from '@/lib/supabase/client'
 
+interface UpcomingAppointment {
+  id: string
+  appointment_date: string
+  appointment_time: string
+  appointment_type: string
+  doctor_name: string
+  location?: string | null
+}
+
 interface Props {
   patient: Patient
   medications: Medication[]
   todayLogs: DoseLog[]
   streak: number
   firstName: string
+  upcomingAppointments?: UpcomingAppointment[]
+  patientTimezone?: string
+  todayLocalStr?: string
 }
 
 type TimeOfDay = 'morning' | 'afternoon' | 'evening'
@@ -34,7 +46,16 @@ function formatTime(isoStr: string): string {
   return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
 }
 
-export default function MyMedsClient({ patient, medications, todayLogs, streak, firstName }: Props) {
+export default function MyMedsClient({
+  patient,
+  medications,
+  todayLogs,
+  streak,
+  firstName,
+  upcomingAppointments = [],
+  patientTimezone = 'America/Chicago',
+  todayLocalStr,
+}: Props) {
   const supabase = createClient()
   const now = new Date()
   const hour = now.getHours()
@@ -181,6 +202,47 @@ export default function MyMedsClient({ patient, medications, todayLogs, streak, 
                 All done! Great job! 🌟
               </p>
             )}
+          </div>
+        )}
+
+        {/* Upcoming Appointments */}
+        {upcomingAppointments.length > 0 && (
+          <div className="bg-white rounded-2xl border border-blue-100 p-5 mb-6">
+            <h2 className="text-xl font-bold text-blue-800 mb-3 flex items-center gap-2">
+              📅 Upcoming Appointments
+            </h2>
+            <div className="divide-y divide-blue-50">
+              {upcomingAppointments.map(appt => {
+                const apptDate = new Date(`${appt.appointment_date}T${appt.appointment_time}`)
+                const apptDateLocalStr = new Intl.DateTimeFormat('en-CA', {
+                  timeZone: patientTimezone,
+                }).format(apptDate)
+                const isToday = todayLocalStr
+                  ? apptDateLocalStr === todayLocalStr
+                  : false
+                const dayLabel = isToday ? 'Today' : 'Tomorrow'
+                const timeStr = new Intl.DateTimeFormat('en-US', {
+                  timeZone: patientTimezone,
+                  hour: 'numeric',
+                  minute: '2-digit',
+                  hour12: true,
+                }).format(apptDate)
+
+                return (
+                  <div key={appt.id} className="py-3 first:pt-0 last:pb-0">
+                    <p className="text-lg font-bold text-blue-700">
+                      {dayLabel} {timeStr}
+                    </p>
+                    <p className="text-xl font-semibold text-gray-900 mt-0.5">
+                      {appt.doctor_name} — {appt.appointment_type}
+                    </p>
+                    {appt.location && (
+                      <p className="text-lg text-gray-500 mt-0.5">{appt.location}</p>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
           </div>
         )}
 

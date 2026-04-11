@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import MyMedsClient from './MyMedsClient'
 import InstallPrompt from '@/components/InstallPrompt'
 import { Medication, DoseLog, Patient } from '@/lib/types'
+import { getTimezoneForState } from '@/lib/stateTimezone'
 
 export default async function MyMedsPage() {
   const supabase = await createClient()
@@ -91,6 +92,22 @@ export default async function MyMedsPage() {
 
   const firstName = patient.name.split(' ')[0]
 
+  // Fetch upcoming appointments for today & tomorrow
+  const patientTimezone = patient.timezone || (patient.state ? getTimezoneForState(patient.state) : 'America/Chicago')
+  const todayLocalStr = new Intl.DateTimeFormat('en-CA', { timeZone: patientTimezone }).format(new Date())
+  const tomorrowLocalDate = new Date(new Date().getTime() + 24 * 60 * 60 * 1000)
+  const tomorrowLocalStr = new Intl.DateTimeFormat('en-CA', { timeZone: patientTimezone }).format(tomorrowLocalDate)
+
+  const { data: upcomingAppointments } = await supabase
+    .from('appointments')
+    .select('id, appointment_date, appointment_time, appointment_type, doctor_name, location')
+    .eq('patient_id', patient.id)
+    .eq('status', 'upcoming')
+    .gte('appointment_date', todayLocalStr)
+    .lte('appointment_date', tomorrowLocalStr)
+    .order('appointment_date', { ascending: true })
+    .order('appointment_time', { ascending: true })
+
   return (
     <>
       <MyMedsClient
@@ -99,6 +116,9 @@ export default async function MyMedsPage() {
         todayLogs={todayLogs || []}
         streak={streak}
         firstName={firstName}
+        upcomingAppointments={upcomingAppointments || []}
+        patientTimezone={patientTimezone}
+        todayLocalStr={todayLocalStr}
       />
       <InstallPrompt />
     </>

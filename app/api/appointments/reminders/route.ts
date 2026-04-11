@@ -1,10 +1,89 @@
 import { NextResponse } from 'next/server'
 import twilio from 'twilio'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { getTimezoneForState } from '@/lib/stateTimezone'
 
 const TWILIO_SID = process.env.TWILIO_ACCOUNT_SID!
 const TWILIO_TOKEN = process.env.TWILIO_AUTH_TOKEN!
 const TWILIO_NUMBER = process.env.TWILIO_PHONE_NUMBER!
+const SMS_APPROVED = process.env.SMS_APPROVED === 'true'
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://rxnudge.app'
+
+// Window constants (in milliseconds)
+const DAY_BEFORE_MIN = (23 * 60 + 45) * 60 * 1000  // 23h45m
+const DAY_BEFORE_MAX = (24 * 60 + 15) * 60 * 1000  // 24h15m
+const ONE_HOUR_MIN  = (45) * 60 * 1000              // 45m
+const ONE_HOUR_MAX  = (60 + 15) * 60 * 1000         // 1h15m
+
+type ReminderWindow = 'day_before' | 'one_hour'
+
+interface ReminderSent {
+  type: string
+  sent_at: string
+  method?: string
+}
+
+function buildApptDateTime(appt: { appointment_date: string; appointment_time: string }): Date {
+  // appointment_date = 'YYYY-MM-DD', appointment_time = 'HH:MM:SS'
+  return new Date(`${appt.appointment_date}T${appt.appointment_time}`)
+}
+
+function formatTimeStr(date: Date, timezone: string): string {
+  return new Intl.DateTimeFormat('en-US', {
+    timeZone: timezone,
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  }).format(date)
+}
+
+function buildPushPayload(
+  window: ReminderWindow,
+  appt: {
+    appointment_type: string
+    doctor_name: string
+    location?: string | null
+  },
+  timeStr: string
+) {
+  const locPart = appt.location ? ` ${appt.location}` : ''
+
+  if (window === 'day_before') {
+    return {
+      title: '📅 Appointment Tomorrow',
+      body: `You have a ${appt.appointment_type} with ${appt.doctor_name} tomorrow at ${timeStr}.${locPart ? ` ${appt.location}` : ''}`,
+      actions: ['Got it ✅', 'Snooze 1hr ⏰'],
+    }
+  } else {
+    return {
+      title: '⏰ Appointment in 1 Hour!',
+      body: `${appt.appointment_type} with ${appt.doctor_name} at ${timeStr}${locPart ? `, ${appt.location}` : ''}. Don't forget!`,
+      actions: ['Got it ✅', 'Need a ride? 🚗'],
+    }
+  }
+}
+
+function buildSmsBody(
+  window: ReminderWindow,
+  appt: {
+    appointment_type: string
+    doctor_name: string
+    location?: string | null
+  },
+  timeStr: string
+): string {
+  const locPart = appt.location ? `, at ${appt.location}` : ''
+
+  if (window === 'day_before') {
+    return (
+      `📅 RxNudge Reminder: You have a ${appt.appointment_type} with ${appt.doctor_name} tomorrow at ${timeStr}${locPart}. Reply STOP to opt out.`
+    )
+  } else {
+    return (
+      `⏰ Reminder: Your ${appt.appointment_type} with ${appt.doctor_name} is in 1 hour at ${timeStr}${locPart}. Reply STOP to opt out.`
+    )
+  }
+}
 
 export async function GET() {
   try {
@@ -12,94 +91,162 @@ export async function GET() {
     const twilioClient = twilio(TWILIO_SID, TWILIO_TOKEN)
 
     const now = new Date()
-    const in24h = new Date(now.getTime() + 24 * 60 * 60 * 1000)
 
-    // Fetch appointments within next 24 hours with status 'upcoming'
-    // that haven't received a 'day_before' reminder yet.
-    // We include the patient's timezone so we can format times correctly.
+    // Fetch all upcoming appointments — we'll filter by window ourselves
     const { data: appointments, error } = await supabase
       .from('appointments')
-      .select('*, patients(id, name, phone, timezone)')
+      .select('*, patients(id, name, phone, state, timezone, contact_method, sms_opted_out)')
       .eq('status', 'upcoming')
-      .gte('appointment_date', now.toISOString().split('T')[0])
-      .lte('appointment_date', in24h.toISOString().split('T')[0])
 
     if (error) {
       console.error('Appointments fetch error:', error)
       return NextResponse.json({ error: 'Database error' }, { status: 500 })
     }
 
-    const results: { appointmentId: string; status: string }[] = []
+    const results: { appointmentId: string; window?: string; status: string; methods?: string[] }[] = []
 
     for (const appt of appointments || []) {
-      const remindersSent: { type: string; sent_at: string }[] = appt.reminders_sent || []
-      const alreadySent = remindersSent.some(r => r.type === 'day_before')
-      if (alreadySent) {
-        results.push({ appointmentId: appt.id, status: 'already_sent' })
-        continue
-      }
-
       const patient = (appt as any).patients
-      if (!patient?.phone) {
-        results.push({ appointmentId: appt.id, status: 'no_phone' })
+      if (!patient) {
+        results.push({ appointmentId: appt.id, status: 'no_patient' })
         continue
       }
 
-      // Format appointment date/time using the patient's timezone
-      const patientTimezone: string = patient.timezone || 'America/Chicago'
+      const remindersSent: ReminderSent[] = appt.reminders_sent || []
 
-      // appointment_date is a date string (YYYY-MM-DD) and appointment_time is "HH:MM:SS"
-      // The combined string is treated as a wall-clock time — we need the UTC equivalent
-      // in the patient's timezone to do proper 24h window checking.
-      // We build the naive date and then verify it falls within the next 24h window.
-      const apptDate = new Date(`${appt.appointment_date}T${appt.appointment_time}:00`)
+      // Determine patient timezone
+      const timezone = patient.timezone || (patient.state ? getTimezoneForState(patient.state) : 'America/Chicago')
 
-      // Verify the appointment is actually within the next 24 hours from now
-      // (the DB query uses UTC dates which may be off by a few hours for edge TZs)
-      if (apptDate.getTime() < now.getTime() || apptDate.getTime() > in24h.getTime()) {
-        results.push({ appointmentId: appt.id, status: 'outside_24h_window' })
+      // Build appointment datetime
+      const apptDate = buildApptDateTime(appt)
+      const msUntil = apptDate.getTime() - now.getTime()
+
+      // Determine which window(s) to process
+      const windows: ReminderWindow[] = []
+
+      const dayBeforeAlreadySent = remindersSent.some(r => r.type === 'day_before')
+      const oneHourAlreadySent = remindersSent.some(r => r.type === 'one_hour')
+
+      if (!dayBeforeAlreadySent && msUntil >= DAY_BEFORE_MIN && msUntil <= DAY_BEFORE_MAX) {
+        windows.push('day_before')
+      }
+      if (!oneHourAlreadySent && msUntil >= ONE_HOUR_MIN && msUntil <= ONE_HOUR_MAX) {
+        windows.push('one_hour')
+      }
+
+      if (windows.length === 0) {
+        results.push({ appointmentId: appt.id, status: 'no_window_matched' })
         continue
       }
-      const dateStr = new Intl.DateTimeFormat('en-US', {
-        timeZone: patientTimezone,
-        weekday: 'long',
-        month: 'long',
-        day: 'numeric',
-      }).format(apptDate)
-      const timeStr = new Intl.DateTimeFormat('en-US', {
-        timeZone: patientTimezone,
-        hour: 'numeric',
-        minute: '2-digit',
-        hour12: true,
-      }).format(apptDate)
 
-      const rideNote = appt.needs_ride ? ' Please arrange transportation.' : ''
-      const message =
-        `RxNudge Reminder: ${patient.name} has a ${appt.appointment_type} appointment with ${appt.doctor_name}` +
-        (appt.location ? ` at ${appt.location}` : '') +
-        ` on ${dateStr} at ${timeStr}.${rideNote}`
+      const timeStr = formatTimeStr(apptDate, timezone)
 
-      try {
-        await twilioClient.messages.create({
-          body: message,
-          from: TWILIO_NUMBER,
-          to: patient.phone,
-        })
+      for (const window of windows) {
+        const methodsUsed: string[] = []
+
+        // 1. Push notification
+        const { data: pushSub } = await supabase
+          .from('push_subscriptions')
+          .select('id')
+          .eq('patient_id', patient.id)
+          .single()
+
+        if (pushSub) {
+          try {
+            const push = buildPushPayload(window, appt, timeStr)
+            const baseUrl = APP_URL.replace(/\/$/, '')
+            await fetch(`${baseUrl}/api/push/send`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                patient_id: patient.id,
+                title: push.title,
+                body: push.body,
+                data: {
+                  type: 'appointment_reminder',
+                  window,
+                  appointmentId: appt.id,
+                  actions: push.actions,
+                },
+              }),
+            })
+            methodsUsed.push('push')
+          } catch (err) {
+            console.error(`Push error for appointment ${appt.id} (${window}):`, err)
+          }
+        }
+
+        // 2. SMS
+        const canSms =
+          SMS_APPROVED &&
+          !patient.sms_opted_out &&
+          patient.phone &&
+          (patient.contact_method === 'text' || patient.contact_method === 'both')
+
+        if (canSms) {
+          try {
+            const smsBody = buildSmsBody(window, appt, timeStr)
+            await twilioClient.messages.create({
+              body: smsBody,
+              from: TWILIO_NUMBER,
+              to: patient.phone,
+            })
+            methodsUsed.push('sms')
+          } catch (err) {
+            console.error(`SMS error for appointment ${appt.id} (${window}):`, err)
+          }
+        }
+
+        // 3. Voice call
+        const canCall =
+          patient.phone &&
+          (patient.contact_method === 'call' || patient.contact_method === 'both')
+
+        if (canCall) {
+          try {
+            const baseUrl = APP_URL.replace(/\/$/, '')
+            const twimlUrl = `${baseUrl}/api/appointments/reminder-call?appointmentId=${encodeURIComponent(appt.id)}&window=${window}`
+            await twilioClient.calls.create({
+              url: twimlUrl,
+              from: TWILIO_NUMBER,
+              to: patient.phone,
+            })
+            methodsUsed.push('call')
+          } catch (err) {
+            console.error(`Voice call error for appointment ${appt.id} (${window}):`, err)
+          }
+        }
 
         // Update reminders_sent
-        const updatedReminders = [
-          ...remindersSent,
-          { type: 'day_before', sent_at: new Date().toISOString() },
-        ]
-        await supabase
-          .from('appointments')
-          .update({ reminders_sent: updatedReminders })
-          .eq('id', appt.id)
+        if (methodsUsed.length > 0 || true) {
+          // Always mark as sent to avoid repeated attempts even if all methods failed
+          const updatedReminders: ReminderSent[] = [
+            ...remindersSent,
+            {
+              type: window,
+              sent_at: new Date().toISOString(),
+              method: methodsUsed.join('+') || 'none',
+            },
+          ]
+          await supabase
+            .from('appointments')
+            .update({ reminders_sent: updatedReminders })
+            .eq('id', appt.id)
 
-        results.push({ appointmentId: appt.id, status: 'sent' })
-      } catch (err) {
-        console.error(`SMS error for appointment ${appt.id}:`, err)
-        results.push({ appointmentId: appt.id, status: 'sms_failed' })
+          // Update remindersSent for subsequent windows in same loop
+          remindersSent.push({
+            type: window,
+            sent_at: new Date().toISOString(),
+            method: methodsUsed.join('+') || 'none',
+          })
+        }
+
+        results.push({
+          appointmentId: appt.id,
+          window,
+          status: methodsUsed.length > 0 ? 'sent' : 'no_methods_available',
+          methods: methodsUsed,
+        })
       }
     }
 
