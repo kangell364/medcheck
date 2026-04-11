@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { Medication, DoseLog } from '@/lib/types'
 import ManualLogButton from '@/components/ManualLogButton'
 import TriggerCallButton from '@/components/TriggerCallButton'
+import DeleteMedButton from '@/components/DeleteMedButton'
 
 /**
  * Format a "HH:MM" reminder_time string in the patient's local timezone.
@@ -217,6 +218,16 @@ export default async function PatientDetailPage({
                       {log.method && ` via ${log.method}`}
                     </p>
                   )}
+                  {/* Edit / Delete actions */}
+                  <div className="flex items-center gap-3 mt-3 ml-9">
+                    <Link
+                      href={`/patients/${id}/medications/${med.id}/edit`}
+                      className="text-xs text-gray-400 hover:text-teal-600 transition-colors"
+                    >
+                      ✏️ Edit
+                    </Link>
+                    <DeleteMedButton medId={med.id} medName={med.name} patientId={id} />
+                  </div>
                 </div>
               )
             })}
