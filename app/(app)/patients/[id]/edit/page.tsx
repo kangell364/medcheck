@@ -49,7 +49,7 @@ export default function EditPatientPage() {
         .single()
 
       if (fetchError || !patient) {
-        setError('Patient not found.')
+        setError('Member not found.')
         setLoading(false)
         return
       }
@@ -112,9 +112,9 @@ export default function EditPatientPage() {
     <div className="max-w-lg mx-auto pb-20 md:pb-0">
       <div className="mb-8">
         <Link href={`/patients/${id}`} className="text-sm text-teal-600 hover:underline mb-4 inline-block">
-          ← Back to Patient
+          ← Back to Member
         </Link>
-        <h1 className="text-3xl font-bold text-gray-900">Edit Patient</h1>
+        <h1 className="text-3xl font-bold text-gray-900">Edit Member</h1>
         <p className="text-gray-500 mt-1">Update contact information and reminder preferences</p>
       </div>
 
@@ -130,7 +130,7 @@ export default function EditPatientPage() {
               onChange={e => setName(e.target.value)}
               required
               className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-teal-500 text-lg"
-              placeholder="Mom, Dad, or patient name"
+              placeholder="Mom, Dad, or member name"
             />
           </div>
 
@@ -237,7 +237,7 @@ export default function EditPatientPage() {
                   className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-teal-500 text-lg"
                 />
                 <p className="text-xs text-gray-400 mt-1">
-                  Reminders are sent in the patient&apos;s timezone ({getTimezoneForState(state)})
+                  Reminders are sent in the member&apos;s timezone ({getTimezoneForState(state)})
                 </p>
               </div>
             </div>

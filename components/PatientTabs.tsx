@@ -411,7 +411,7 @@ export default function PatientTabs({
             <div className="bg-white rounded-2xl border-2 border-dashed border-gray-200 p-8 text-center">
               <div className="text-4xl mb-3">👨‍⚕️</div>
               <h3 className="font-semibold text-gray-900 mb-1">No doctors yet</h3>
-              <p className="text-sm text-gray-500 mb-4">Add doctors associated with this patient.</p>
+              <p className="text-sm text-gray-500 mb-4">Add doctors associated with this member.</p>
               <Link
                 href={`/patients/${patient.id}/doctors/new`}
                 className="bg-teal-600 hover:bg-teal-700 text-white font-medium py-2.5 px-6 rounded-xl inline-block text-sm transition-colors"
@@ -470,7 +470,7 @@ export default function PatientTabs({
             <div className="bg-white rounded-2xl border-2 border-dashed border-gray-200 p-8 text-center">
               <div className="text-4xl mb-3">📅</div>
               <h3 className="font-semibold text-gray-900 mb-1">No appointments yet</h3>
-              <p className="text-sm text-gray-500 mb-4">Schedule appointments for this patient.</p>
+              <p className="text-sm text-gray-500 mb-4">Schedule appointments for this member.</p>
               <Link
                 href={`/appointments/new?patientId=${patient.id}`}
                 className="bg-teal-600 hover:bg-teal-700 text-white font-medium py-2.5 px-6 rounded-xl inline-block text-sm transition-colors"

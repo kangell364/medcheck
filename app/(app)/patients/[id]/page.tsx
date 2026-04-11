@@ -95,7 +95,7 @@ export default async function PatientDetailPage({
         <div className="mb-4 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 flex items-center gap-3">
           <span className="text-xl">⏳</span>
           <p className="text-sm text-amber-800 font-medium">
-            This patient hasn&apos;t approved their account yet.
+            This member hasn&apos;t approved their account yet.
           </p>
         </div>
       )}
@@ -103,7 +103,7 @@ export default async function PatientDetailPage({
       {/* Patient Header */}
       <div className="mb-6">
         <Link href="/patients" className="text-sm text-teal-600 hover:underline mb-4 inline-block">
-          ← Back to Patients
+          ← Back to Members
         </Link>
         <div className="flex items-start justify-between">
           <div>

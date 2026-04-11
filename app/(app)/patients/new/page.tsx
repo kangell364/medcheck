@@ -162,9 +162,9 @@ export default function NewPatientPage() {
 
       <div className="mb-8">
         <Link href="/patients" className="text-sm text-teal-600 hover:underline mb-4 inline-block">
-          ← Back to Patients
+          ← Back to Members
         </Link>
-        <h1 className="text-3xl font-bold text-gray-900">Add Patient</h1>
+        <h1 className="text-3xl font-bold text-gray-900">Add Member</h1>
         <p className="text-gray-500 mt-1">Who are you setting this up for?</p>
       </div>
 
@@ -240,7 +240,7 @@ export default function NewPatientPage() {
           onClick={() => setValidationMsg('Please select who you are adding first.')}
           className="w-full bg-teal-600 hover:bg-teal-700 text-white font-semibold py-3 px-6 rounded-xl text-lg transition-colors mb-4"
         >
-          Add Patient
+          Add Member
         </button>
       )}
 
@@ -261,7 +261,7 @@ export default function NewPatientPage() {
                 required
                 readOnly={isSelf}
                 className={`w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-teal-500 text-lg ${isSelf ? 'bg-gray-50 text-gray-500' : ''}`}
-                placeholder={patientType === 'household' ? "Mom, Dad, spouse..." : "Their full name"}
+                placeholder={patientType === 'household' ? "Mom, Dad, spouse..." : "Their full name"}  
               />
               {isSelf && <p className="text-xs text-gray-400 mt-1">Auto-filled from your account</p>}
             </div>
@@ -320,8 +320,8 @@ export default function NewPatientPage() {
                 />
                 <label htmlFor="patientConsent" className="text-sm text-amber-900 cursor-pointer leading-snug">
                   <span className="font-semibold">I confirm this person has consented</span> to receive
-                  automated reminder calls and texts from RxNudge at the number above. I have the legal
-                  authority to enroll them and accept the{' '}
+                  automated reminder calls and texts from RxNudge at the number above. I have permission
+                  from this person to add them to my account and accept the{' '}
                   <a href="/terms" target="_blank" className="underline font-medium">Terms of Service</a>{' '}
                   on their behalf.
                 </label>
@@ -344,7 +344,7 @@ export default function NewPatientPage() {
               }}
               className="w-full bg-teal-600 hover:bg-teal-700 text-white font-semibold py-3 px-6 rounded-xl text-lg transition-colors disabled:opacity-50"
             >
-              {loading ? 'Adding patient…' : 'Add Patient'}
+              {loading ? 'Adding member…' : 'Add Member'}
             </button>
 
           </form>

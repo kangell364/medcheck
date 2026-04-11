@@ -57,10 +57,10 @@ export default function NewDoctorPage({ params }: Props) {
     <div className="max-w-xl mx-auto pb-20 md:pb-0">
       <div className="mb-6">
         <Link href={`/patients/${id}?tab=doctors`} className="text-sm text-teal-600 hover:underline mb-4 inline-block">
-          ← Back to Patient
+          ← Back to Member
         </Link>
         <h1 className="text-3xl font-bold text-gray-900">Add Doctor</h1>
-        <p className="text-gray-500 mt-1">Add a doctor associated with this patient.</p>
+        <p className="text-gray-500 mt-1">Add a doctor associated with this member.</p>
       </div>
 
       <form onSubmit={handleSubmit} className="bg-white rounded-2xl border border-gray-100 p-6 space-y-5">

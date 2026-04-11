@@ -59,7 +59,7 @@ export default function NewAlertContactPage() {
     <div className="max-w-lg mx-auto pb-20 md:pb-0">
       <div className="mb-8">
         <Link href={`/patients/${patientId}`} className="text-sm text-teal-600 hover:underline mb-4 inline-block">
-          ← Back to Patient
+          ← Back to Member
         </Link>
         <h1 className="text-3xl font-bold text-gray-900">Add Alert Contact</h1>
         <p className="text-gray-500 mt-1">This person will be notified when a dose is missed</p>
@@ -150,7 +150,7 @@ export default function NewAlertContactPage() {
           {/* Info box */}
           <div className="bg-teal-50 border border-teal-100 rounded-xl px-4 py-3">
             <p className="text-sm text-teal-700">
-              💡 This contact will receive alerts when the patient misses a dose or doesn&apos;t respond to a reminder call. You can add multiple contacts — great for siblings sharing care responsibilities.
+              💡 This contact will receive alerts when the member misses a dose or doesn&apos;t respond to a reminder call. You can add multiple contacts — great for siblings sharing care responsibilities.
             </p>
           </div>
 

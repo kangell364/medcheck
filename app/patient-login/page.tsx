@@ -30,7 +30,7 @@ function PatientLoginInner() {
 
         if (!res.ok || !data.success) {
           setStatus('error')
-          setErrorMsg(data.error || 'Login failed. Please try again or contact your caregiver.')
+          setErrorMsg(data.error || 'Login failed. Please try again or contact the account holder.')
           return
         }
 
@@ -48,7 +48,7 @@ function PatientLoginInner() {
         }, 1000)
       } catch {
         setStatus('error')
-        setErrorMsg('Something went wrong. Please try again or contact your caregiver.')
+        setErrorMsg('Something went wrong. Please try again or contact the account holder.')
       }
     }
 
@@ -85,7 +85,7 @@ function PatientLoginInner() {
             <p className="text-xl font-semibold text-red-700 mb-3">{errorMsg}</p>
             <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 mt-4">
               <p className="text-lg text-amber-800">
-                📱 Ask your caregiver to send you a new login link to your phone.
+                📱 Ask the account holder to send you a new login link to your phone.
               </p>
             </div>
           </>

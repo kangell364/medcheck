@@ -84,8 +84,8 @@ export default async function AlertsPage({ searchParams }: PageProps) {
         <h1 className="text-3xl font-bold text-gray-900">Alert Log</h1>
         <p className="text-gray-500 mt-1">
           {patientId
-            ? 'Activity for this patient'
-            : 'History of all activity across your patients'}
+            ? 'Activity for this member'
+            : 'History of all activity across your members'}
         </p>
       </div>
 
@@ -136,7 +136,7 @@ function EmptyState({ activeFilter }: { activeFilter: AlertFilter }) {
     <div className="max-w-3xl mx-auto pb-20 md:pb-0">
       <div className="mb-6">
         <h1 className="text-3xl font-bold text-gray-900">Alert Log</h1>
-        <p className="text-gray-500 mt-1">History of all activity across your patients</p>
+        <p className="text-gray-500 mt-1">History of all activity across your members</p>
       </div>
       <Suspense fallback={null}>
         <AlertFilters activeFilter={activeFilter} />

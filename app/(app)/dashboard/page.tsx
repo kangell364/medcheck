@@ -135,13 +135,13 @@ export default async function DashboardPage() {
       {(!patients || patients.length === 0) && (
         <div className="bg-white rounded-2xl border-2 border-dashed border-gray-200 p-12 text-center">
           <div className="text-5xl mb-4">💊</div>
-          <h2 className="text-xl font-semibold text-gray-900 mb-2">Add your first patient to get started</h2>
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">Add your first member to get started</h2>
           <p className="text-gray-500 mb-6">Track medications for a parent, spouse, or yourself.</p>
           <Link
             href="/patients/new"
             className="bg-teal-600 hover:bg-teal-700 text-white font-semibold py-3 px-8 rounded-xl inline-block transition-colors"
           >
-            ➕ Add Your First Patient
+            ➕ Add Your First Member
           </Link>
         </div>
       )}
@@ -254,7 +254,7 @@ export default async function DashboardPage() {
             href="/patients/new"
             className="bg-white hover:bg-gray-50 border border-gray-200 text-gray-700 font-medium py-3 px-6 rounded-xl text-sm transition-colors flex items-center gap-2"
           >
-            <span>➕</span> Add Patient
+            <span>➕</span> Add Member
           </Link>
           <Link
             href="/history"

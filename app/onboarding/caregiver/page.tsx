@@ -97,9 +97,9 @@ export default function CaregiverOnboardingPage() {
           </div>
 
           <div className="bg-blue-50 rounded-xl p-4 space-y-4">
-            <h3 className="font-semibold text-gray-700 text-sm uppercase tracking-wide">Patient Info</h3>
+            <h3 className="font-semibold text-gray-700 text-sm uppercase tracking-wide">Member Info</h3>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Patient Name</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Member Name</label>
               <input
                 type="text"
                 value={patientName}
@@ -110,7 +110,7 @@ export default function CaregiverOnboardingPage() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Patient Phone (for calls)</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Member Phone (for calls)</label>
               <input
                 type="tel"
                 value={patientPhone}
@@ -121,7 +121,7 @@ export default function CaregiverOnboardingPage() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Patient State *</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Member State *</label>
               <select
                 value={patientState}
                 onChange={e => setPatientState(e.target.value)}

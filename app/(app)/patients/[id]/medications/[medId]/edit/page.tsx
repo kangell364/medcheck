@@ -123,7 +123,7 @@ export default function EditMedicationPage() {
     <div className="max-w-lg mx-auto pb-20 md:pb-0">
       <div className="mb-8">
         <Link href={`/patients/${patientId}`} className="text-sm text-teal-600 hover:underline mb-4 inline-block">
-          ← Back to Patient
+          ← Back to Member
         </Link>
         <h1 className="text-3xl font-bold text-gray-900">Edit Medication</h1>
         <p className="text-gray-500 mt-1">Update medication details and reminder times</p>

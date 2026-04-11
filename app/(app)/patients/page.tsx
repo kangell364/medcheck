@@ -35,8 +35,8 @@ export default function PatientsPage() {
       <div className="max-w-3xl mx-auto pb-20 md:pb-0">
         <div className="flex items-center justify-between mb-8">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Patients</h1>
-            <p className="text-gray-500 mt-1">Manage medication tracking for your patients</p>
+            <h1 className="text-3xl font-bold text-gray-900">Members</h1>
+            <p className="text-gray-500 mt-1">Manage medication tracking for your members</p>
           </div>
         </div>
         <div className="text-center py-12 text-gray-400">Loading…</div>
@@ -53,7 +53,7 @@ export default function PatientsPage() {
             <div className="text-5xl mb-4">⏳</div>
             <h2 className="text-xl font-bold text-gray-900 mb-3">Awaiting Confirmation</h2>
             <p className="text-gray-600 mb-6">
-              This patient hasn&apos;t confirmed enrollment yet. Their profile will unlock
+              This member hasn&apos;t confirmed enrollment yet. Their profile will unlock
               once they reply <span className="font-semibold text-teal-600">YES</span> to our text.
             </p>
             <button
@@ -68,27 +68,27 @@ export default function PatientsPage() {
 
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Patients</h1>
-          <p className="text-gray-500 mt-1">Manage medication tracking for your patients</p>
+          <h1 className="text-3xl font-bold text-gray-900">Members</h1>
+          <p className="text-gray-500 mt-1">Manage medication tracking for your members</p>
         </div>
         <Link
           href="/patients/new"
           className="bg-teal-600 hover:bg-teal-700 text-white font-semibold py-3 px-6 rounded-xl transition-colors flex items-center gap-2"
         >
-          <span>➕</span> Add Patient
+          <span>➕</span> Add Member
         </Link>
       </div>
 
       {patients.length === 0 ? (
         <div className="bg-white rounded-2xl border-2 border-dashed border-gray-200 p-12 text-center">
           <div className="text-5xl mb-4">👤</div>
-          <h2 className="text-xl font-semibold text-gray-900 mb-2">No patients yet</h2>
-          <p className="text-gray-500 mb-6">Add a patient to start tracking their medications.</p>
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">No members yet</h2>
+          <p className="text-gray-500 mb-6">Add a member to start tracking their medications.</p>
           <Link
             href="/patients/new"
             className="bg-teal-600 hover:bg-teal-700 text-white font-semibold py-3 px-8 rounded-xl inline-block transition-colors"
           >
-            Add First Patient
+            Add First Member
           </Link>
         </div>
       ) : (

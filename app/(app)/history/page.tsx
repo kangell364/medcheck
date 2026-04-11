@@ -142,7 +142,7 @@ export default async function HistoryPage() {
         <div className="bg-white rounded-2xl border-2 border-dashed border-gray-200 p-12 text-center">
           <div className="text-5xl mb-4">📅</div>
           <h2 className="text-xl font-semibold text-gray-900 mb-2">No history yet</h2>
-          <p className="text-gray-500">Add patients and medications to start tracking.</p>
+          <p className="text-gray-500">Add members and medications to start tracking.</p>
         </div>
       )}
 
