@@ -34,10 +34,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No active medications' }, { status: 400 })
     }
 
-    // Create dose log entries for today
-    const now = new Date()
-    const scheduledAt = new Date()
-    scheduledAt.setHours(0, 0, 0, 0)
+    // Create dose log entries for today.
+    // Use midnight in the patient's timezone as the canonical "scheduled_at" for today.
+    const patientTimezone: string = patient.timezone || 'America/Chicago'
+    const todayDateInPatientTz = new Date().toLocaleDateString('en-CA', { timeZone: patientTimezone }) // YYYY-MM-DD
+    // Compute the UTC timestamp for midnight in the patient's timezone
+    const utcMidnight = new Date(`${todayDateInPatientTz}T00:00:00.000Z`)
+    const offsetMs = utcMidnight.getTime() - new Date(utcMidnight.toLocaleString('en-US', { timeZone: patientTimezone })).getTime()
+    const scheduledAt = new Date(utcMidnight.getTime() + offsetMs)
 
     // Create pending dose logs
     for (const med of medications) {

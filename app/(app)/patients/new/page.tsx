@@ -5,14 +5,14 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 
-const TIMEZONES = [
-  'America/New_York',
-  'America/Chicago',
-  'America/Denver',
-  'America/Los_Angeles',
-  'America/Phoenix',
-  'America/Anchorage',
-  'Pacific/Honolulu',
+const TIMEZONES: { value: string; label: string }[] = [
+  { value: 'America/New_York', label: 'Eastern (ET)' },
+  { value: 'America/Chicago', label: 'Central (CT)' },
+  { value: 'America/Denver', label: 'Mountain (MT)' },
+  { value: 'America/Phoenix', label: 'Arizona — no DST (MST)' },
+  { value: 'America/Los_Angeles', label: 'Pacific (PT)' },
+  { value: 'America/Anchorage', label: 'Alaska (AKT)' },
+  { value: 'Pacific/Honolulu', label: 'Hawaii (HST)' },
 ]
 
 export default function NewPatientPage() {
@@ -98,7 +98,7 @@ export default function NewPatientPage() {
               className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-teal-500 text-lg"
             >
               {TIMEZONES.map(tz => (
-                <option key={tz} value={tz}>{tz.replace('America/', '').replace('_', ' ')}</option>
+                <option key={tz.value} value={tz.value}>{tz.label}</option>
               ))}
             </select>
           </div>

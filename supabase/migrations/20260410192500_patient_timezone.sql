@@ -1,0 +1,1 @@
+ALTER TABLE patients ADD COLUMN IF NOT EXISTS timezone TEXT NOT NULL DEFAULT 'America/Chicago';

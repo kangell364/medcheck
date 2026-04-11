@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
 import { Patient, Medication, DoseLog } from '@/lib/types'
+import DashboardGreeting from '@/components/DashboardGreeting'
 
 function formatApptDateTime(dateStr: string, timeStr: string): string {
   const dt = new Date(`${dateStr}T${timeStr}`)
@@ -11,13 +12,6 @@ function formatApptDateTime(dateStr: string, timeStr: string): string {
   hours = hours % 12 || 12
   const minStr = minutes === 0 ? '00' : minutes.toString().padStart(2, '0')
   return `${date} at ${hours}:${minStr} ${ampm}`
-}
-
-function getGreeting() {
-  const hour = new Date().getHours()
-  if (hour < 12) return 'Good morning'
-  if (hour < 17) return 'Good afternoon'
-  return 'Good evening'
 }
 
 export default async function DashboardPage() {
@@ -84,15 +78,11 @@ export default async function DashboardPage() {
     .limit(3)
 
   const displayName = profile?.full_name?.split(' ')[0] || 'there'
-  const dateStr = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
 
   return (
     <div className="max-w-4xl mx-auto pb-20 md:pb-0">
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">{getGreeting()}, {displayName}! 👋</h1>
-        <p className="text-gray-500 mt-1">{dateStr}</p>
-      </div>
+      {/* Header — client component so greeting/date use the user's browser timezone */}
+      <DashboardGreeting displayName={displayName} />
 
       {/* No patients yet */}
       {(!patients || patients.length === 0) && (

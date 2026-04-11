@@ -137,9 +137,13 @@ export async function POST(request: NextRequest) {
     return new NextResponse(twiml.toString(), { headers: { 'Content-Type': 'text/xml' } })
   }
 
-  // Handle dose logging based on intent
-  const scheduledAt = new Date()
-  scheduledAt.setHours(0, 0, 0, 0)
+  // Handle dose logging based on intent.
+  // Use midnight in the patient's timezone as the canonical scheduled_at for today.
+  const patientTimezone: string = patient?.timezone || 'America/Chicago'
+  const todayDateInPatientTz = new Date().toLocaleDateString('en-CA', { timeZone: patientTimezone }) // YYYY-MM-DD
+  const utcMidnight = new Date(`${todayDateInPatientTz}T00:00:00.000Z`)
+  const tzOffsetMs = utcMidnight.getTime() - new Date(utcMidnight.toLocaleString('en-US', { timeZone: patientTimezone })).getTime()
+  const scheduledAt = new Date(utcMidnight.getTime() + tzOffsetMs)
 
   if (intent === 'YES') {
     if (currentMed) {

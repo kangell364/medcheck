@@ -5,24 +5,35 @@ import { Medication, DoseLog } from '@/lib/types'
 import ManualLogButton from '@/components/ManualLogButton'
 import TriggerCallButton from '@/components/TriggerCallButton'
 
-function formatTime(time: string): string {
+/**
+ * Format a "HH:MM" reminder_time string in the patient's local timezone.
+ * We construct a date for today at that wall-clock hour/minute in the
+ * patient's timezone and format it back for display.
+ */
+function formatTimeInTz(time: string, timezone: string): string {
   const [hourStr, minuteStr] = time.split(':')
-  const hour = parseInt(hourStr, 10)
-  const minute = parseInt(minuteStr, 10)
-  const ampm = hour >= 12 ? 'PM' : 'AM'
-  const displayHour = hour % 12 || 12
-  const displayMinute = minute === 0 ? '00' : minuteStr.padStart(2, '0')
-  return `${displayHour}:${displayMinute} ${ampm}`
+  // Build a date string that represents today's date at the given wall-clock time
+  // in the patient's timezone, then format it back out in that same timezone.
+  const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: timezone }) // YYYY-MM-DD
+  const fakeDate = new Date(`${todayStr}T${hourStr.padStart(2, '0')}:${minuteStr.padStart(2, '0')}:00`)
+  return new Intl.DateTimeFormat('en-US', {
+    timeZone: timezone,
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  }).format(fakeDate)
 }
 
-function formatCallbackTime(isoString: string): string {
-  const date = new Date(isoString)
-  let hours = date.getHours()
-  const minutes = date.getMinutes()
-  const ampm = hours >= 12 ? 'PM' : 'AM'
-  hours = hours % 12 || 12
-  const minStr = minutes === 0 ? '00' : minutes.toString().padStart(2, '0')
-  return `${hours}:${minStr} ${ampm}`
+/**
+ * Format an ISO timestamp in the patient's local timezone.
+ */
+function formatIsoInTz(isoString: string, timezone: string): string {
+  return new Intl.DateTimeFormat('en-US', {
+    timeZone: timezone,
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  }).format(new Date(isoString))
 }
 
 export default async function PatientDetailPage({
@@ -168,14 +179,14 @@ export default async function PatientDetailPage({
                         <div className="flex flex-wrap gap-2 mt-2">
                           {med.reminder_times.map(t => (
                             <span key={t} className="text-sm font-semibold bg-white/80 px-3 py-1 rounded-full text-gray-700 border border-gray-200">
-                              🕐 {formatTime(t)}
+                              🕐 {formatTimeInTz(t, patient.timezone)}
                             </span>
                           ))}
                         </div>
                         {/* Callback badge */}
                         {pendingCallback && (
                           <span className="inline-flex items-center gap-1 mt-2 text-xs font-semibold bg-orange-100 text-orange-700 px-2.5 py-1 rounded-full border border-orange-200">
-                            📞 Callback at {formatCallbackTime(pendingCallback.scheduled_for)}
+                            📞 Callback at {formatIsoInTz(pendingCallback.scheduled_for, patient.timezone)}
                           </span>
                         )}
                       </div>
@@ -197,7 +208,7 @@ export default async function PatientDetailPage({
                   </div>
                   {log?.confirmed_at && status !== 'snoozed' && (
                     <p className="text-xs text-gray-400 mt-2 ml-9">
-                      {status === 'confirmed' ? 'Confirmed' : 'Recorded'} at {new Date(log.confirmed_at).toLocaleTimeString()}
+                      {status === 'confirmed' ? 'Confirmed' : 'Recorded'} at {formatIsoInTz(log.confirmed_at, patient.timezone)}
                       {log.method && ` via ${log.method}`}
                     </p>
                   )}

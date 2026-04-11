@@ -15,10 +15,11 @@ export async function GET() {
     const in24h = new Date(now.getTime() + 24 * 60 * 60 * 1000)
 
     // Fetch appointments within next 24 hours with status 'upcoming'
-    // that haven't received a 'day_before' reminder yet
+    // that haven't received a 'day_before' reminder yet.
+    // We include the patient's timezone so we can format times correctly.
     const { data: appointments, error } = await supabase
       .from('appointments')
-      .select('*, patients(id, name, phone)')
+      .select('*, patients(id, name, phone, timezone)')
       .eq('status', 'upcoming')
       .gte('appointment_date', now.toISOString().split('T')[0])
       .lte('appointment_date', in24h.toISOString().split('T')[0])
@@ -44,18 +45,33 @@ export async function GET() {
         continue
       }
 
-      // Format appointment date/time nicely
-      const apptDate = new Date(`${appt.appointment_date}T${appt.appointment_time}`)
-      const dateStr = apptDate.toLocaleDateString('en-US', {
+      // Format appointment date/time using the patient's timezone
+      const patientTimezone: string = patient.timezone || 'America/Chicago'
+
+      // appointment_date is a date string (YYYY-MM-DD) and appointment_time is "HH:MM:SS"
+      // The combined string is treated as a wall-clock time — we need the UTC equivalent
+      // in the patient's timezone to do proper 24h window checking.
+      // We build the naive date and then verify it falls within the next 24h window.
+      const apptDate = new Date(`${appt.appointment_date}T${appt.appointment_time}:00`)
+
+      // Verify the appointment is actually within the next 24 hours from now
+      // (the DB query uses UTC dates which may be off by a few hours for edge TZs)
+      if (apptDate.getTime() < now.getTime() || apptDate.getTime() > in24h.getTime()) {
+        results.push({ appointmentId: appt.id, status: 'outside_24h_window' })
+        continue
+      }
+      const dateStr = new Intl.DateTimeFormat('en-US', {
+        timeZone: patientTimezone,
         weekday: 'long',
         month: 'long',
         day: 'numeric',
-      })
-      const timeStr = apptDate.toLocaleTimeString('en-US', {
+      }).format(apptDate)
+      const timeStr = new Intl.DateTimeFormat('en-US', {
+        timeZone: patientTimezone,
         hour: 'numeric',
         minute: '2-digit',
         hour12: true,
-      })
+      }).format(apptDate)
 
       const rideNote = appt.needs_ride ? ' Please arrange transportation.' : ''
       const message =
