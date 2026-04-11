@@ -254,20 +254,24 @@ export default async function HistoryPage() {
             <div className="overflow-x-auto">
               <div className="min-w-max">
 
-                {/* Date header row */}
-                <div className="flex items-end mb-2">
+                {/* Date header row — must use same gap-1 as data rows so labels align */}
+                <div className="flex items-end gap-1 mb-2">
                   {/* Spacer: med name column (w-44) + time label column (w-20) */}
                   <div className="w-44 shrink-0 sticky left-0 z-20 bg-white" />
-                  <div className="w-20 shrink-0 sticky left-44 z-20 bg-white" />
-                  {days.map((day, i) => (
-                    <div key={i} className="w-7 shrink-0 text-center">
-                      {(i % 7 === 0 || i === 29) && (
-                        <span className="text-xs text-gray-400 leading-none">
-                          {day.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                        </span>
-                      )}
-                    </div>
-                  ))}
+                  <div className="w-20 shrink-0 sticky left-[180px] z-20 bg-white" />
+                  {days.map((day, i) => {
+                    // Show label every 7th day (0, 7, 14, 21) and last day
+                    const showLabel = i % 7 === 0 || i === days.length - 1
+                    return (
+                      <div key={i} className="w-7 shrink-0 text-center overflow-visible">
+                        {showLabel && (
+                          <span className="text-[10px] text-gray-400 leading-none whitespace-nowrap">
+                            {day.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                          </span>
+                        )}
+                      </div>
+                    )
+                  })}
                 </div>
 
                 {/* No medications message */}
@@ -366,8 +370,8 @@ export default async function HistoryPage() {
                               )}
                             </div>
 
-                            {/* ── Time label (sticky after med name col) ── */}
-                            <div className="w-20 shrink-0 sticky left-44 z-10 bg-white pr-2 self-stretch flex items-center">
+                            {/* ── Time label (sticky after med name col, left-0 + w-44 + gap-1(4px) = 180px) ── */}
+                            <div className="w-20 shrink-0 sticky left-[180px] z-10 bg-white pr-2 self-stretch flex items-center">
                               <span className="text-xs font-medium text-gray-500 whitespace-nowrap">
                                 {formatTime(rt)}
                               </span>

@@ -29,6 +29,7 @@ export default async function PatientDetailPage({
     .select('*')
     .eq('patient_id', id)
     .eq('active', true)
+    .is('archived_at', null)
     .order('created_at') as { data: Medication[] | null }
 
   const { data: archivedMedications } = await supabase
@@ -36,6 +37,7 @@ export default async function PatientDetailPage({
     .select('*')
     .eq('patient_id', id)
     .eq('active', false)
+    .not('archived_at', 'is', null)
     .order('created_at') as { data: Medication[] | null }
 
   const today = new Date()
@@ -48,7 +50,7 @@ export default async function PatientDetailPage({
     .select('*')
     .eq('patient_id', id)
     .gte('scheduled_at', today.toISOString())
-    .lt('scheduled_at', tomorrow.toISOString()) as { data: (DoseLog & { snooze_until?: string | null })[] | null }
+    .lt('scheduled_at', tomorrow.toISOString()) as { data: DoseLog[] | null }
 
   const { data: alerts } = await supabase
     .from('patient_alerts')

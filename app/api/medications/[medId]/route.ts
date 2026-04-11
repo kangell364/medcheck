@@ -36,13 +36,24 @@ export async function PATCH(
   }
 
   const body = await req.json()
-  const { name, nickname, dosage, start_date, reminder_times, notes, active } = body
+  const { name, nickname, dosage, start_date, reminder_times, notes, active, archived } = body
 
-  // Archive / restore shortcut — only update active flag
-  if (typeof active === 'boolean' && Object.keys(body).length === 1) {
+  // Archive / restore shortcut — accepts either { active: bool } or { archived: bool }
+  const isArchiveToggle =
+    (typeof active === 'boolean' && Object.keys(body).length === 1) ||
+    (typeof archived === 'boolean' && Object.keys(body).length === 1)
+
+  if (isArchiveToggle) {
+    // Determine intent: archived=true or active=false means archive; archived=false or active=true means restore
+    const archiving = typeof archived === 'boolean' ? archived : !active
+    const updatePayload: Record<string, unknown> = {
+      active: !archiving,
+      archived_at: archiving ? new Date().toISOString() : null,
+    }
+
     const { data, error } = await supabase
       .from('medications')
-      .update({ active } as any)
+      .update(updatePayload as any)
       .eq('id', medId)
       .select()
       .single()
@@ -56,7 +67,7 @@ export async function PATCH(
       patientName: (patient as any).name,
       medicationId: medId,
       medicationName: medication.name,
-      internalDetails: { action: active ? 'restored' : 'archived' },
+      internalDetails: { action: archiving ? 'archived' : 'restored' },
     })
 
     return NextResponse.json({ medication: data })

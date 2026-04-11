@@ -221,12 +221,26 @@ export default function PatientHistory({
     }
   }
 
-  // Overall adherence stats
+  // Count days in the range that are >= a given start_date string (YYYY-MM-DD)
+  function getDaysFromStartDate(med: Medication): number {
+    const sd = med.start_date as string | null
+    if (!sd) return days.length
+    return dayDateStrs.filter(dateStr => dateStr >= sd).length
+  }
+
+  // Overall adherence stats — only counting days from each med's start_date onward
   const totalSlots = medications.reduce(
-    (sum, med) => sum + (med.reminder_times.length || 1) * days.length,
+    (sum, med) => sum + (med.reminder_times.length || 1) * getDaysFromStartDate(med),
     0
   )
-  const totalConfirmed = doseLogs.filter(l => l.confirmed === true).length
+  const totalConfirmed = doseLogs.filter(l => {
+    if (l.confirmed !== true) return false
+    const med = medications.find(m => m.id === l.medication_id)
+    if (!med) return false
+    const sd = med.start_date as string | null
+    if (!sd) return true
+    return scheduledDateInTz(l.scheduled_at, timezone) >= sd
+  }).length
   const overallPct = totalSlots > 0 ? Math.round((totalConfirmed / totalSlots) * 100) : 0
 
   // ─── UI ───────────────────────────────────────────────────────────────────
@@ -353,28 +367,21 @@ export default function PatientHistory({
           <div className="overflow-x-auto">
             <div className="min-w-max">
 
-              {/* Date header row */}
+              {/* Date header row — must use same gap-1 as data rows so labels align precisely */}
               <div className="flex items-end gap-1 mb-2">
                 <div className="w-44 shrink-0 sticky left-0 z-20 bg-white" />
-                <div className="w-20 shrink-0 sticky left-44 z-20 bg-white" />
+                {/* Second sticky spacer: left-0 + w-44(176px) + gap-1(4px) = 180px */}
+                <div className="w-20 shrink-0 sticky left-[180px] z-20 bg-white" />
                 {days.map((day, i) => {
-                  // For 7d show every day; for 14d show every 2nd; for 30d show every 5th
-                  const step = days.length <= 7 ? 1 : days.length <= 14 ? 2 : 5
+                  // Show label every 7th day and always on last day
+                  const step = days.length <= 7 ? 1 : days.length <= 14 ? 2 : 7
                   const showLabel = i % step === 0 || i === days.length - 1
-                  const isFirstOfMonth = day.getDate() === 1
                   return (
-                    <div key={i} className="w-7 shrink-0 text-center">
+                    <div key={i} className="w-7 shrink-0 text-center overflow-visible">
                       {showLabel && (
-                        <>
-                          {(i === 0 || isFirstOfMonth) && (
-                            <div className="text-xs text-gray-300 leading-none">
-                              {day.toLocaleDateString('en-US', { month: 'short' })}
-                            </div>
-                          )}
-                          <span className="text-xs text-gray-400 leading-none">
-                            {day.getDate()}
-                          </span>
-                        </>
+                        <span className="text-[10px] text-gray-400 leading-none whitespace-nowrap">
+                          {day.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                        </span>
                       )}
                     </div>
                   )
@@ -390,14 +397,24 @@ export default function PatientHistory({
                 const logsForThisMed = doseLogs.filter(l => l.medication_id === med.id)
                 const snapshotName = logsForThisMed.find(l => l.medication_name)?.medication_name ?? null
 
-                const medTotalSlots = times.length * days.length
+                const medStartDate = med.start_date as string | null
+                const medDaysCount = getDaysFromStartDate(med)
+                const medTotalSlots = times.length * medDaysCount
                 const medConfirmed = times.reduce((sum, rt) => {
                   const byDate = slotMap[med.id]?.[rt] ?? {}
-                  return sum + Object.values(byDate).filter((l: DoseLog) => l.confirmed === true).length
+                  return sum + Object.values(byDate).filter((l: DoseLog) => {
+                    if (l.confirmed !== true) return false
+                    if (!medStartDate) return true
+                    return scheduledDateInTz(l.scheduled_at, timezone) >= medStartDate
+                  }).length
                 }, 0)
                 const medMissed = times.reduce((sum, rt) => {
                   const byDate = slotMap[med.id]?.[rt] ?? {}
-                  return sum + Object.values(byDate).filter((l: DoseLog) => l.confirmed === false).length
+                  return sum + Object.values(byDate).filter((l: DoseLog) => {
+                    if (l.confirmed !== false) return false
+                    if (!medStartDate) return true
+                    return scheduledDateInTz(l.scheduled_at, timezone) >= medStartDate
+                  }).length
                 }, 0)
                 const medPct = medTotalSlots > 0 ? Math.round((medConfirmed / medTotalSlots) * 100) : 0
 
@@ -446,8 +463,8 @@ export default function PatientHistory({
                             )}
                           </div>
 
-                          {/* Sticky time column */}
-                          <div className="w-20 shrink-0 sticky left-44 z-10 bg-white pr-2 self-stretch flex items-center">
+                          {/* Sticky time column: left-0 + w-44(176px) + gap-1(4px) = 180px */}
+                          <div className="w-20 shrink-0 sticky left-[180px] z-10 bg-white pr-2 self-stretch flex items-center">
                             <span className="text-xs font-medium text-gray-500 whitespace-nowrap">
                               {formatTime(rt)}
                             </span>
@@ -455,6 +472,11 @@ export default function PatientHistory({
 
                           {/* Day dots */}
                           {dayDateStrs.map((dateStr, dayIdx) => {
+                            // Hide cells before start_date — render empty spacer (not counted in adherence)
+                            if (medStartDate && dateStr < medStartDate) {
+                              return <div key={dayIdx} className="w-7 h-7 shrink-0" />
+                            }
+
                             const log = byDate[dateStr]
 
                             let bg = 'bg-gray-100 border border-gray-200'

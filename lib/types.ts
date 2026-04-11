@@ -38,6 +38,7 @@ export interface Medication {
   notes: string | null
   active: boolean
   start_date: string | null
+  archived_at: string | null
   created_at: string
 }
 
@@ -49,8 +50,9 @@ export interface DoseLog {
   scheduled_at: string
   confirmed: boolean | null
   confirmed_at: string | null
-  method: 'call' | 'sms' | 'inbound' | 'manual' | 'app' | null
+  method: 'call' | 'sms' | 'inbound' | 'manual' | 'app' | 'snooze' | null
   call_sid: string | null
+  snooze_until: string | null
   created_at: string
 }
 

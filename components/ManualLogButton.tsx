@@ -15,6 +15,8 @@ interface Props {
   scheduledTime: string
   /** IANA timezone for the patient (e.g. "America/Chicago") */
   patientTimezone: string
+  /** Optional callback fired when snooze is successfully set, with the snooze_until ISO string */
+  onSnooze?: (snoozeUntil: string) => void
 }
 
 function formatSnoozeTime(isoString: string): string {
@@ -35,6 +37,7 @@ export default function ManualLogButton({
   snoozeUntil: initialSnoozeUntil,
   scheduledTime,
   patientTimezone,
+  onSnooze,
 }: Props) {
   const [loading, setLoading] = useState(false)
   const [snoozeUntil, setSnoozeUntil] = useState<string | null>(initialSnoozeUntil ?? null)
@@ -72,6 +75,7 @@ export default function ManualLogButton({
 
   function handleSnooze(snoozeUntilTimestamp: string) {
     setSnoozeUntil(snoozeUntilTimestamp)
+    onSnooze?.(snoozeUntilTimestamp)
   }
 
   if (isSnoozed) {

@@ -39,7 +39,7 @@ interface PatientTabsProps {
   patient: Patient & { timezone: string }
   medications: Medication[]
   archivedMedications?: Medication[]
-  todayLogs: (DoseLog & { snooze_until?: string | null })[]
+  todayLogs: DoseLog[]
   alerts: PatientAlert[]
   pendingCallbacks: any[]
   appointments: Appointment[]
@@ -121,6 +121,12 @@ export default function PatientTabs({
   const initialTab = (searchParams.get('tab') as TabId) || 'medications'
   const [activeTab, setActiveTab] = useState<TabId>(initialTab)
   const [archiveOpen, setArchiveOpen] = useState(false)
+  // snoozeMap tracks optimistic snooze_until per medication ID after user clicks Snooze
+  const [snoozeMap, setSnoozeMap] = useState<Record<string, string>>({})
+
+  function handleMedSnooze(medId: string, snoozeUntil: string) {
+    setSnoozeMap(prev => ({ ...prev, [medId]: snoozeUntil }))
+  }
 
   // Sync tab state with URL
   function switchTab(tab: TabId) {
@@ -133,12 +139,22 @@ export default function PatientTabs({
   // ─── Medication helpers ─────────────────────────────────────────────────
 
   const getMedStatus = (medId: string) => {
+    // Check optimistic snooze state first (set after user clicks Snooze)
+    const optimisticSnooze = snoozeMap[medId]
+    if (optimisticSnooze && new Date(optimisticSnooze) > new Date()) return 'snoozed'
     const log = todayLogs.find(l => l.medication_id === medId)
     if (!log) return 'pending'
     if (log.snooze_until && new Date(log.snooze_until) > new Date()) return 'snoozed'
     if (log.confirmed === true) return 'confirmed'
     if (log.confirmed === false) return 'missed'
     return 'pending'
+  }
+
+  // Get snooze_until for a med (optimistic first, then from server logs)
+  const getMedSnoozeUntil = (medId: string): string | null => {
+    if (snoozeMap[medId]) return snoozeMap[medId]
+    const log = todayLogs.find(l => l.medication_id === medId)
+    return log?.snooze_until ?? null
   }
 
   const getPendingCallback = (medId: string) => {
@@ -276,18 +292,32 @@ export default function PatientTabs({
                           </div>
                         </div>
                         <div className="flex flex-col items-end gap-2">
-                          <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${config.class}`}>
-                            {config.label}
-                          </span>
-                          {status !== 'confirmed' && (
+                          {status === 'snoozed' ? (
+                            <div className="flex flex-col items-end gap-0.5">
+                              <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-50 border border-amber-200 text-amber-700">
+                                ⏰ Snoozed
+                              </span>
+                              {getMedSnoozeUntil(med.id) && (
+                                <span className="text-xs text-amber-600">
+                                  Reminds at {formatIsoInTz(getMedSnoozeUntil(med.id)!, patient.timezone)}
+                                </span>
+                              )}
+                            </div>
+                          ) : (
+                            <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${config.class}`}>
+                              {config.label}
+                            </span>
+                          )}
+                          {status !== 'confirmed' && status !== 'snoozed' && (
                             <ManualLogButton
                               medicationId={med.id}
                               patientId={patient.id}
                               medicationName={med.name}
                               scheduledAt={todayStr}
-                              snoozeUntil={log?.snooze_until ?? null}
+                              snoozeUntil={getMedSnoozeUntil(med.id)}
                               scheduledTime={getRelevantReminderTime(med.reminder_times)}
                               patientTimezone={patient.timezone}
+                              onSnooze={(su) => handleMedSnooze(med.id, su)}
                             />
                           )}
                         </div>
