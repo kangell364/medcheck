@@ -11,6 +11,7 @@ type PatientType = 'self' | 'household' | 'outside' | null
 interface EnrollmentModal {
   name: string
   phone: string
+  email: string
 }
 
 export default function NewPatientPage() {
@@ -76,6 +77,7 @@ export default function NewPatientPage() {
         owner_id: user.id,
         name,
         phone,
+        email: email || null,
         state,
         timezone: getTimezoneForState(state),
         is_self: isSelf,
@@ -91,29 +93,31 @@ export default function NewPatientPage() {
     }
 
     if (!isSelf) {
+      // Send enrollment email
       try {
-        await fetch('/api/enrollment/sms', {
+        await fetch('/api/enrollment/email', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ patientId: data.id }),
         })
-      } catch (smsErr) {
-        console.error('Enrollment failed:', smsErr)
+      } catch (emailErr) {
+        console.error('Enrollment email failed:', emailErr)
       }
       setLoading(false)
-      setEnrollmentModal({ name: data.name, phone: data.phone })
+      setEnrollmentModal({ name: data.name, phone: data.phone, email: data.email ?? email })
     } else {
       router.push(`/patients/${data.id}`)
     }
   }
 
   const isSelf = patientType === 'self'
-  const canSubmit = patientType !== null && name && phone && (isSelf || patientConsent)
+  const canSubmit = patientType !== null && name && phone && (isSelf || (patientConsent && !!email))
 
   function getValidationMessage(): string | null {
     if (!patientType) return 'Please select who you are adding first.'
     if (!name) return 'Please enter a full name.'
     if (!phone) return 'Please enter a phone number.'
+    if (!isSelf && !email) return 'Please enter an email address.'
     if (!isSelf && !patientConsent) return 'Please confirm you have consent to enroll this person.'
     return null
   }
@@ -142,14 +146,19 @@ export default function NewPatientPage() {
       {enrollmentModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-8 text-center">
-            <div className="text-5xl mb-4">📱</div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-3">Enrollment Sent!</h2>
+            <div className="text-5xl mb-4">✉️</div>
+            <h2 className="text-2xl font-bold text-gray-900 mb-3">Enrollment Email Sent!</h2>
             <p className="text-gray-600 mb-6">
-              An enrollment message has been sent to{' '}
+              An enrollment email has been sent to{' '}
               <span className="font-semibold text-gray-900">{enrollmentModal.name}</span> at{' '}
-              <span className="font-semibold text-gray-900">{enrollmentModal.phone}</span>.
-              They must confirm before their profile becomes active.
+              <span className="font-semibold text-gray-900">{enrollmentModal.email}</span>.
+              They must click Accept in the email before their profile becomes active.
             </p>
+            {enrollmentModal.phone && (
+              <p className="text-sm text-gray-500 mb-6">
+                Phone on file: <span className="font-medium text-gray-700">{enrollmentModal.phone}</span>
+              </p>
+            )}
             <button
               onClick={() => { setEnrollmentModal(null); router.push('/patients') }}
               className="w-full bg-teal-600 hover:bg-teal-700 text-white font-semibold py-3 px-6 rounded-xl text-lg transition-colors"
@@ -282,6 +291,27 @@ export default function NewPatientPage() {
               />
               <p className="text-xs text-gray-400 mt-1">
                 {isSelf ? 'Auto-filled from your account' : 'This is the number we will call or text for reminders'}
+              </p>
+            </div>
+
+            {/* Email Address */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Email Address {!isSelf && <span className="text-red-500">*</span>}
+              </label>
+              <input
+                type="email"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                required={!isSelf}
+                readOnly={isSelf}
+                className={`w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-teal-500 text-lg ${isSelf ? 'bg-gray-50 text-gray-500' : ''}`}
+                placeholder={isSelf ? '' : 'their@email.com'}
+              />
+              <p className="text-xs text-gray-400 mt-1">
+                {isSelf
+                  ? 'Auto-filled from your account'
+                  : 'An enrollment email with an Accept button will be sent here'}
               </p>
             </div>
 
