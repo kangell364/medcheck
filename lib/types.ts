@@ -46,6 +46,13 @@ export interface Patient {
   user_id?: string | null
   /** Stored password for magic link sign-in (generated on enrollment) */
   generated_password?: string | null
+  /** Persistent public token for /p/[token] page — no login required */
+  permanent_token?: string | null
+  /** TCPA / terms consent tracking */
+  terms_accepted_at?: string | null
+  terms_accepted_ip?: string | null
+  terms_version?: string | null
+  sms_consent_at?: string | null
   created_at: string
 }
 

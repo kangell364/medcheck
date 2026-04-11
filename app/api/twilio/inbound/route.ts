@@ -170,6 +170,22 @@ export async function POST(request: NextRequest) {
           }
         }
 
+        // Send permanent patient link via separate SMS
+        const { data: updatedPatient } = await supabase
+          .from('patients')
+          .select('permanent_token')
+          .eq('id', pendingPatient.id)
+          .single()
+
+        if (updatedPatient?.permanent_token) {
+          const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://rxnudge.app'
+          const permanentLink = `${appUrl}/p/${updatedPatient.permanent_token}`
+          // We'll append this to the enrollment confirmation or send as follow-up
+          if (!appLinkMsg) {
+            appLinkMsg = ` Bookmark your medication page: ${permanentLink} 💊`
+          }
+        }
+
         twiml.message(
           `You're all set! RxNudge will remind you about your medications daily. Reply STOP anytime to opt out.${appLinkMsg}`
         )

@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import MyMedsClient from './MyMedsClient'
+import InstallPrompt from '@/components/InstallPrompt'
 import { Medication, DoseLog, Patient } from '@/lib/types'
 
 export default async function MyMedsPage() {
@@ -91,12 +92,15 @@ export default async function MyMedsPage() {
   const firstName = patient.name.split(' ')[0]
 
   return (
-    <MyMedsClient
-      patient={patient}
-      medications={medications || []}
-      todayLogs={todayLogs || []}
-      streak={streak}
-      firstName={firstName}
-    />
+    <>
+      <MyMedsClient
+        patient={patient}
+        medications={medications || []}
+        todayLogs={todayLogs || []}
+        streak={streak}
+        firstName={firstName}
+      />
+      <InstallPrompt />
+    </>
   )
 }
