@@ -33,6 +33,7 @@ export default function ReportModal({ patientData, userEmail, userName }: Report
   })
   const [email, setEmail] = useState(userEmail)
   const [loading, setLoading] = useState(false)
+  const [pdfLoading, setPdfLoading] = useState(false)
   const [result, setResult] = useState<{ success: boolean; message: string } | null>(null)
 
   const toggleMed = (medId: string) => {
@@ -96,6 +97,52 @@ export default function ReportModal({ patientData, userEmail, userName }: Report
     }
   }
 
+  const handleDownloadPDF = async () => {
+    if (selectedMeds.size === 0) {
+      setResult({ success: false, message: 'Please select at least one medication.' })
+      return
+    }
+    setPdfLoading(true)
+    setResult(null)
+    try {
+      const patientGroups = patientData
+        .map(({ patient, meds }) => ({
+          patientId: patient.id,
+          medicationIds: meds.filter(m => selectedMeds.has(m.id)).map(m => m.id),
+        }))
+        .filter(g => g.medicationIds.length > 0)
+
+      const res = await fetch('/api/reports/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          patientGroups,
+          dateFrom,
+          dateTo,
+          email: '__pdf__',
+          requestedBy: userName || userEmail,
+          pdfOnly: true,
+        }),
+      })
+      const data = await res.json()
+      if (res.ok && data.html) {
+        // Open in new tab and trigger print dialog (save as PDF)
+        const win = window.open('', '_blank')
+        if (win) {
+          win.document.write(data.html)
+          win.document.close()
+          setTimeout(() => win.print(), 800)
+        }
+      } else {
+        setResult({ success: false, message: data.error || 'Failed to generate PDF.' })
+      }
+    } catch {
+      setResult({ success: false, message: 'Network error. Please try again.' })
+    } finally {
+      setPdfLoading(false)
+    }
+  }
+
   const totalMeds = patientData.reduce((sum, { meds }) => sum + meds.length, 0)
 
   return (
@@ -103,9 +150,9 @@ export default function ReportModal({ patientData, userEmail, userName }: Report
       {/* Trigger button */}
       <button
         onClick={() => { setIsOpen(true); setResult(null) }}
-        className="flex items-center gap-2 px-4 py-2 bg-teal-600 text-white rounded-xl text-sm font-medium hover:bg-teal-700 transition-colors shadow-sm"
+        className="flex items-center gap-2 px-5 py-2.5 bg-teal-600 text-white rounded-xl text-sm font-semibold hover:bg-teal-700 transition-colors shadow-md"
       >
-        📋 Report
+        📋 Generate Report
       </button>
 
       {/* Modal backdrop */}
@@ -233,20 +280,28 @@ export default function ReportModal({ patientData, userEmail, userName }: Report
               )}
 
               {/* Actions */}
-              <div className="flex gap-3 pt-2">
+              <div className="flex gap-3 pt-2 flex-wrap">
                 <button
                   type="button"
                   onClick={() => setIsOpen(false)}
-                  className="flex-1 px-4 py-3 border border-gray-200 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-50 transition-colors"
+                  className="px-4 py-3 border border-gray-200 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-50 transition-colors"
                 >
                   Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDownloadPDF}
+                  disabled={pdfLoading || selectedMeds.size === 0}
+                  className="flex-1 px-4 py-3 bg-gray-800 text-white rounded-xl text-sm font-semibold hover:bg-gray-900 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {pdfLoading ? '⏳ Building…' : '📄 Download PDF'}
                 </button>
                 <button
                   type="submit"
                   disabled={loading || selectedMeds.size === 0}
                   className="flex-1 px-4 py-3 bg-teal-600 text-white rounded-xl text-sm font-semibold hover:bg-teal-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {loading ? '⏳ Generating…' : '📧 Generate & Send Report'}
+                  {loading ? '⏳ Sending…' : '📧 Email Report'}
                 </button>
               </div>
             </form>

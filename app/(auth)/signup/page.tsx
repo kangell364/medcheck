@@ -9,6 +9,7 @@ export default function SignupPage() {
   const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [agreedToTerms, setAgreedToTerms] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const router = useRouter()
@@ -92,6 +93,27 @@ export default function SignupPage() {
             />
           </div>
 
+          {/* Terms & Conditions */}
+          <div className="flex items-start gap-3 pt-1">
+            <input
+              type="checkbox"
+              id="terms"
+              checked={agreedToTerms}
+              onChange={e => setAgreedToTerms(e.target.checked)}
+              className="mt-0.5 w-4 h-4 rounded border-gray-300 text-teal-600 focus:ring-teal-500 shrink-0 cursor-pointer"
+            />
+            <label htmlFor="terms" className="text-sm text-gray-600 cursor-pointer leading-snug">
+              I agree to the{' '}
+              <Link href="/terms" target="_blank" className="text-teal-600 font-medium hover:underline">
+                Terms of Service
+              </Link>{' '}
+              and{' '}
+              <Link href="/privacy" target="_blank" className="text-teal-600 font-medium hover:underline">
+                Privacy Policy
+              </Link>
+            </label>
+          </div>
+
           {error && (
             <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm">
               {error}
@@ -100,8 +122,8 @@ export default function SignupPage() {
 
           <button
             type="submit"
-            disabled={loading}
-            className="w-full bg-teal-600 hover:bg-teal-700 text-white font-semibold py-3 px-6 rounded-xl text-lg transition-colors disabled:opacity-50"
+            disabled={loading || !agreedToTerms}
+            className="w-full bg-teal-600 hover:bg-teal-700 text-white font-semibold py-3 px-6 rounded-xl text-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? 'Creating account…' : 'Create Account'}
           </button>

@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Medication, DoseLog } from '@/lib/types'
 
+
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 interface PatientHistoryProps {
@@ -262,13 +263,7 @@ export default function PatientHistory({
               <p className="text-xs text-gray-400">overall</p>
             </div>
           )}
-          <button
-            disabled
-            title="Report coming soon"
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-gray-200 text-sm text-gray-400 cursor-not-allowed bg-gray-50"
-          >
-            📋 Report
-          </button>
+
         </div>
       </div>
 
@@ -359,18 +354,31 @@ export default function PatientHistory({
             <div className="min-w-max">
 
               {/* Date header row */}
-              <div className="flex items-end mb-2">
+              <div className="flex items-end gap-1 mb-2">
                 <div className="w-44 shrink-0 sticky left-0 z-20 bg-white" />
                 <div className="w-20 shrink-0 sticky left-44 z-20 bg-white" />
-                {days.map((day, i) => (
-                  <div key={i} className="w-7 shrink-0 text-center">
-                    {(i % 7 === 0 || i === days.length - 1) && (
-                      <span className="text-xs text-gray-400 leading-none">
-                        {day.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                      </span>
-                    )}
-                  </div>
-                ))}
+                {days.map((day, i) => {
+                  // For 7d show every day; for 14d show every 2nd; for 30d show every 5th
+                  const step = days.length <= 7 ? 1 : days.length <= 14 ? 2 : 5
+                  const showLabel = i % step === 0 || i === days.length - 1
+                  const isFirstOfMonth = day.getDate() === 1
+                  return (
+                    <div key={i} className="w-7 shrink-0 text-center">
+                      {showLabel && (
+                        <>
+                          {(i === 0 || isFirstOfMonth) && (
+                            <div className="text-xs text-gray-300 leading-none">
+                              {day.toLocaleDateString('en-US', { month: 'short' })}
+                            </div>
+                          )}
+                          <span className="text-xs text-gray-400 leading-none">
+                            {day.getDate()}
+                          </span>
+                        </>
+                      )}
+                    </div>
+                  )
+                })}
               </div>
 
               {/* One grouped block per medication */}

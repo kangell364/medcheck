@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { Medication, DoseLog } from '@/lib/types'
 import TriggerCallButton from '@/components/TriggerCallButton'
 import PatientTabs from '@/components/PatientTabs'
+import ReportModal from '@/components/ReportModal'
 
 export default async function PatientDetailPage({
   params,
@@ -28,6 +29,13 @@ export default async function PatientDetailPage({
     .select('*')
     .eq('patient_id', id)
     .eq('active', true)
+    .order('created_at') as { data: Medication[] | null }
+
+  const { data: archivedMedications } = await supabase
+    .from('medications')
+    .select('*')
+    .eq('patient_id', id)
+    .eq('active', false)
     .order('created_at') as { data: Medication[] | null }
 
   const today = new Date()
@@ -78,6 +86,16 @@ export default async function PatientDetailPage({
 
   return (
     <div className="max-w-3xl mx-auto pb-20 md:pb-0">
+      {/* Pending enrollment banner */}
+      {patient.enrollment_status === 'pending' && (
+        <div className="mb-4 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 flex items-center gap-3">
+          <span className="text-xl">⏳</span>
+          <p className="text-sm text-amber-800 font-medium">
+            This patient hasn&apos;t approved their account yet.
+          </p>
+        </div>
+      )}
+
       {/* Patient Header */}
       <div className="mb-6">
         <Link href="/patients" className="text-sm text-teal-600 hover:underline mb-4 inline-block">
@@ -93,17 +111,24 @@ export default async function PatientDetailPage({
             </div>
             <p className="text-gray-500">{patient.phone} • {patient.timezone}</p>
           </div>
-          <TriggerCallButton
-            patientId={patient.id}
-            patientName={patient.name}
-            medications={(medications || []).map(m => ({
-              id: m.id,
-              name: m.name,
-              nickname: (m as any).nickname,
-              reminder_times: m.reminder_times,
-            }))}
-            timezone={patient.timezone}
-          />
+          <div className="flex items-center gap-3">
+            <ReportModal
+              patientData={[{ patient, meds: medications || [] }]}
+              userEmail={user?.email || ''}
+              userName={patient.name}
+            />
+            <TriggerCallButton
+              patientId={patient.id}
+              patientName={patient.name}
+              medications={(medications || []).map(m => ({
+                id: m.id,
+                name: m.name,
+                nickname: (m as any).nickname,
+                reminder_times: m.reminder_times,
+              }))}
+              timezone={patient.timezone}
+            />
+          </div>
         </div>
       </div>
 
@@ -111,6 +136,7 @@ export default async function PatientDetailPage({
       <PatientTabs
         patient={patient}
         medications={medications || []}
+        archivedMedications={archivedMedications || []}
         todayLogs={todayLogs || []}
         alerts={alerts || []}
         pendingCallbacks={pendingCallbacks || []}

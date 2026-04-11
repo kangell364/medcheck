@@ -16,6 +16,7 @@ interface RequestBody {
   dateTo: string
   email: string
   requestedBy: string
+  pdfOnly?: boolean
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -488,7 +489,7 @@ function buildEmailHTML(params: {
 export async function POST(req: NextRequest) {
   try {
     const body: RequestBody = await req.json()
-    const { patientGroups, dateFrom, dateTo, email, requestedBy } = body
+    const { patientGroups, dateFrom, dateTo, email, requestedBy, pdfOnly } = body
 
     if (!patientGroups || patientGroups.length === 0) {
       return NextResponse.json({ error: 'No patients/medications selected.' }, { status: 400 })
@@ -545,7 +546,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'No data found for selected patients.' }, { status: 404 })
     }
 
-    // Build email HTML
+    // Build HTML report
     const html = buildEmailHTML({
       patients,
       dateFrom,
@@ -554,6 +555,21 @@ export async function POST(req: NextRequest) {
       recipientEmail: email,
       generatedDate,
     })
+
+    // PDF-only mode: return HTML for browser print-to-PDF
+    if (pdfOnly) {
+      // Wrap with print-friendly styles
+      const printHtml = html.replace(
+        '</head>',
+        `<style>
+          @media print {
+            body { background: white !important; }
+            @page { margin: 0.5in; size: A4; }
+          }
+        </style></head>`
+      )
+      return NextResponse.json({ success: true, html: printHtml })
+    }
 
     // Determine subject
     const patientNames = patients.map(p => p.patient.name).join(', ')

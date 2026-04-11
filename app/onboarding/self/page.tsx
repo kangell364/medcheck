@@ -23,7 +23,7 @@ export default function SelfOnboardingPage() {
     // Update profile user type
     await supabase.from('profiles').update({ user_type: 'self', phone }).eq('id', user.id)
 
-    // Create patient as self
+    // Create patient as self (enrollment is automatic — no SMS needed)
     const { data, error } = await supabase
       .from('patients')
       .insert({
@@ -32,6 +32,7 @@ export default function SelfOnboardingPage() {
         phone,
         is_self: true,
         timezone: 'America/Chicago',
+        enrollment_status: 'active',
       })
       .select()
       .single()

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import twilio from 'twilio'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { requiresRecordingDisclosure, RECORDING_DISCLOSURE_TEXT } from '@/lib/recordingConsent'
 
 const VoiceResponse = twilio.twiml.VoiceResponse
 
@@ -38,6 +39,11 @@ export async function POST(request: NextRequest) {
 
   // Greeting for first medication
   if (medIndex === 0) {
+    // Play recording disclosure ONLY in all-party consent states
+    if (requiresRecordingDisclosure((patient as any)?.state)) {
+      twiml.say({ voice: 'Polly.Joanna' }, RECORDING_DISCLOSURE_TEXT)
+      twiml.pause({ length: 1 })
+    }
     twiml.say({ voice: 'Polly.Joanna' }, `Hello ${firstName}, this is your RxNudge medication reminder.`)
     twiml.pause({ length: 1 })
   }

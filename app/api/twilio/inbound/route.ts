@@ -3,15 +3,75 @@ import twilio from 'twilio'
 import { createAdminClient } from '@/lib/supabase/admin'
 
 const VoiceResponse = twilio.twiml.VoiceResponse
+const MessagingResponse = twilio.twiml.MessagingResponse
 
-// Handles inbound calls — patient calls in to check their status
+// Handle inbound calls (voice) — patient calls in to check their status
 export async function POST(request: NextRequest) {
+  const contentType = request.headers.get('content-type') || ''
   const formData = await request.formData()
-  const callerNumber = formData.get('From') as string
-  const digits = formData.get('Digits') as string | null
 
-  const twiml = new VoiceResponse()
   const supabase = createAdminClient()
+
+  // ----------------------------------------------------------------
+  // SMS inbound — enrollment YES/NO handler
+  // ----------------------------------------------------------------
+  const messageBody = formData.get('Body') as string | null
+  if (messageBody !== null) {
+    const fromNumber = formData.get('From') as string
+    const trimmed = messageBody.trim().toUpperCase()
+
+    // Check if this number has a pending enrollment
+    const { data: pendingPatient } = await supabase
+      .from('patients')
+      .select('*')
+      .eq('phone', fromNumber)
+      .eq('enrollment_status', 'pending')
+      .single()
+
+    if (pendingPatient) {
+      const twiml = new MessagingResponse()
+
+      if (trimmed === 'YES') {
+        await supabase
+          .from('patients')
+          .update({ enrollment_status: 'active' })
+          .eq('id', pendingPatient.id)
+
+        twiml.message(
+          "You're all set! RxNudge will remind you about your medications daily. Reply STOP anytime to opt out. 💊"
+        )
+      } else if (trimmed === 'NO') {
+        await supabase
+          .from('patients')
+          .update({ enrollment_status: 'declined' })
+          .eq('id', pendingPatient.id)
+
+        twiml.message(
+          "Understood. You've been unenrolled from RxNudge. Contact your caregiver if this was a mistake."
+        )
+      } else {
+        twiml.message(
+          'Please reply YES to confirm enrollment or NO to decline.'
+        )
+      }
+
+      return new NextResponse(twiml.toString(), {
+        headers: { 'Content-Type': 'text/xml' },
+      })
+    }
+
+    // No pending enrollment — return empty 200 (or could handle other SMS flows)
+    const twiml = new MessagingResponse()
+    return new NextResponse(twiml.toString(), {
+      headers: { 'Content-Type': 'text/xml' },
+    })
+  }
+
+  // ----------------------------------------------------------------
+  // Voice inbound — patient calls in to check their status
+  // ----------------------------------------------------------------
+  const callerNumber = formData.get('From') as string
+  const twiml = new VoiceResponse()
 
   // Find patient by phone number
   const { data: patient } = await supabase

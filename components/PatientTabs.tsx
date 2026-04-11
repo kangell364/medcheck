@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { Medication, DoseLog, PatientAlert, Patient } from '@/lib/types'
 import ManualLogButton from '@/components/ManualLogButton'
 import DeleteMedButton from '@/components/DeleteMedButton'
+import ArchiveMedButton from '@/components/ArchiveMedButton'
 import DeleteDoctorButton from '@/components/DeleteDoctorButton'
 import PatientHistory from '@/components/PatientHistory'
 import RecentActivityList from '@/components/RecentActivityList'
@@ -37,6 +38,7 @@ interface Appointment {
 interface PatientTabsProps {
   patient: Patient & { timezone: string }
   medications: Medication[]
+  archivedMedications?: Medication[]
   todayLogs: (DoseLog & { snooze_until?: string | null })[]
   alerts: PatientAlert[]
   pendingCallbacks: any[]
@@ -105,6 +107,7 @@ const apptStatusConfig: Record<string, { label: string; class: string }> = {
 export default function PatientTabs({
   patient,
   medications,
+  archivedMedications = [],
   todayLogs,
   alerts,
   pendingCallbacks,
@@ -117,6 +120,7 @@ export default function PatientTabs({
 
   const initialTab = (searchParams.get('tab') as TabId) || 'medications'
   const [activeTab, setActiveTab] = useState<TabId>(initialTab)
+  const [archiveOpen, setArchiveOpen] = useState(false)
 
   // Sync tab state with URL
   function switchTab(tab: TabId) {
@@ -301,6 +305,7 @@ export default function PatientTabs({
                         >
                           ✏️ Edit
                         </Link>
+                        <ArchiveMedButton medId={med.id} medName={med.name} patientId={patient.id} />
                         <DeleteMedButton medId={med.id} medName={med.name} patientId={patient.id} />
                       </div>
                     </div>
@@ -309,6 +314,53 @@ export default function PatientTabs({
               </div>
             )}
           </section>
+
+          {/* ── Archived Medications ── */}
+          {archivedMedications.length > 0 && (
+            <section className="mt-2">
+              <button
+                onClick={() => setArchiveOpen(o => !o)}
+                className="flex items-center gap-2 w-full text-left py-3 px-4 rounded-xl bg-gray-50 hover:bg-gray-100 transition-colors border border-gray-200"
+              >
+                <span className="text-base">{archiveOpen ? '🔽' : '▶️'}</span>
+                <span className="text-sm font-semibold text-gray-500">
+                  Archived Medications ({archivedMedications.length})
+                </span>
+              </button>
+
+              {archiveOpen && (
+                <div className="mt-3 space-y-3">
+                  {archivedMedications.map(med => (
+                    <div key={med.id} className="bg-gray-50 rounded-2xl border border-gray-200 p-5 opacity-70">
+                      <div className="flex items-start gap-3">
+                        <span className="text-2xl mt-0.5">📦</span>
+                        <div className="flex-1">
+                          <h3 className="font-bold text-gray-500 text-xl line-through">{med.name}</h3>
+                          {(med as any).nickname && (
+                            <p className="text-sm text-gray-400">&quot;{(med as any).nickname}&quot;</p>
+                          )}
+                          {med.dosage && (
+                            <p className="text-sm text-gray-400">{med.dosage}</p>
+                          )}
+                          <div className="flex flex-wrap gap-2 mt-2">
+                            {med.reminder_times.map(t => (
+                              <span key={t} className="text-xs bg-gray-200 px-2 py-0.5 rounded-full text-gray-500">
+                                🕐 {formatTimeInTz(t, patient.timezone)}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3 mt-3 ml-11">
+                        <ArchiveMedButton medId={med.id} medName={med.name} patientId={patient.id} isArchived />
+                        <DeleteMedButton medId={med.id} medName={med.name} patientId={patient.id} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
+          )}
         </div>
       )}
 

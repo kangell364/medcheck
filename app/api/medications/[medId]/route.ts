@@ -36,7 +36,31 @@ export async function PATCH(
   }
 
   const body = await req.json()
-  const { name, nickname, dosage, reminder_times, notes } = body
+  const { name, nickname, dosage, reminder_times, notes, active } = body
+
+  // Archive / restore shortcut — only update active flag
+  if (typeof active === 'boolean' && Object.keys(body).length === 1) {
+    const { data, error } = await supabase
+      .from('medications')
+      .update({ active } as any)
+      .eq('id', medId)
+      .select()
+      .single()
+
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+    await logEvent({
+      patientId: medication.patient_id,
+      ownerId: user.id,
+      eventType: 'med_edited',
+      patientName: (patient as any).name,
+      medicationId: medId,
+      medicationName: medication.name,
+      internalDetails: { action: active ? 'restored' : 'archived' },
+    })
+
+    return NextResponse.json({ medication: data })
+  }
 
   const { data, error } = await supabase
     .from('medications')
@@ -46,6 +70,7 @@ export async function PATCH(
       dosage: dosage || null,
       reminder_times,
       notes: notes || null,
+      ...(typeof active === 'boolean' ? { active } : {}),
     } as any)
     .eq('id', medId)
     .select()

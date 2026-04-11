@@ -16,6 +16,7 @@ export interface Patient {
   timezone: string
   is_self: boolean
   active: boolean
+  enrollment_status: 'pending' | 'active' | 'declined' | 'inactive'
   created_at: string
 }
 
