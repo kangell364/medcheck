@@ -13,7 +13,10 @@ export interface Patient {
   owner_id: string
   name: string
   phone: string
-  timezone: string
+  /** US state abbreviation (e.g. "TX"). Timezone is derived from this via getTimezoneForState(). */
+  state: string | null
+  /** @deprecated Stored in DB for legacy rows. New code derives timezone from state. */
+  timezone?: string | null
   is_self: boolean
   active: boolean
   enrollment_status: 'pending' | 'active' | 'declined' | 'inactive'

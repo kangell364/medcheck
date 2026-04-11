@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import twilio from 'twilio'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { adminLogEvent } from '@/lib/logEvent'
+import { getTimezoneForState } from '@/lib/stateTimezone'
 
 // Window (in minutes) around reminder_time within which we fire reminders
 const REMINDER_WINDOW_MINUTES = 15
@@ -167,7 +168,8 @@ export async function POST(request: NextRequest) {
     //    We honour the window here so cron can call this endpoint for every
     //    patient and let each decide for itself.
     const reminderTime: string = patient.reminder_time ?? '08:00:00'
-    const timezone: string = patient.timezone ?? 'America/Chicago'
+    // Derive timezone from state; fall back to stored timezone for legacy rows, then default
+    const timezone: string = getTimezoneForState(patient.state ?? '') || patient.timezone || 'America/Chicago'
     if (!isInReminderWindow(reminderTime, timezone)) {
       return NextResponse.json({ skipped: true, reason: 'outside_reminder_window' })
     }

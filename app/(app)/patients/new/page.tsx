@@ -4,38 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
-
-const TIMEZONES: { value: string; label: string }[] = [
-  { value: 'America/New_York', label: 'Eastern (ET)' },
-  { value: 'America/Chicago', label: 'Central (CT)' },
-  { value: 'America/Denver', label: 'Mountain (MT)' },
-  { value: 'America/Phoenix', label: 'Arizona — no DST (MST)' },
-  { value: 'America/Los_Angeles', label: 'Pacific (PT)' },
-  { value: 'America/Anchorage', label: 'Alaska (AKT)' },
-  { value: 'Pacific/Honolulu', label: 'Hawaii (HST)' },
-]
-
-const US_STATES = [
-  ['AL','Alabama'],['AK','Alaska'],['AZ','Arizona'],['AR','Arkansas'],['CA','California'],
-  ['CO','Colorado'],['CT','Connecticut'],['DE','Delaware'],['FL','Florida'],['GA','Georgia'],
-  ['HI','Hawaii'],['ID','Idaho'],['IL','Illinois'],['IN','Indiana'],['IA','Iowa'],
-  ['KS','Kansas'],['KY','Kentucky'],['LA','Louisiana'],['ME','Maine'],['MD','Maryland'],
-  ['MA','Massachusetts'],['MI','Michigan'],['MN','Minnesota'],['MS','Mississippi'],['MO','Missouri'],
-  ['MT','Montana'],['NE','Nebraska'],['NV','Nevada'],['NH','New Hampshire'],['NJ','New Jersey'],
-  ['NM','New Mexico'],['NY','New York'],['NC','North Carolina'],['ND','North Dakota'],['OH','Ohio'],
-  ['OK','Oklahoma'],['OR','Oregon'],['PA','Pennsylvania'],['RI','Rhode Island'],['SC','South Carolina'],
-  ['SD','South Dakota'],['TN','Tennessee'],['TX','Texas'],['UT','Utah'],['VT','Vermont'],
-  ['VA','Virginia'],['WA','Washington'],['WV','West Virginia'],['WI','Wisconsin'],['WY','Wyoming'],
-]
-
-// States requiring all-party recording consent (shown with ⚠️ indicator)
-const ALL_PARTY_STATES = new Set(['CA','FL','IL','MD','MA','MI','MT','NV','NH','OR','PA','WA'])
-
-const STATE_NAMES: Record<string, string> = {
-  CA: 'California', FL: 'Florida', IL: 'Illinois', MD: 'Maryland', MA: 'Massachusetts',
-  MI: 'Michigan', MT: 'Montana', NV: 'Nevada', NH: 'New Hampshire', OR: 'Oregon',
-  PA: 'Pennsylvania', WA: 'Washington',
-}
+import { US_STATES, TWO_PARTY_CONSENT_STATES, getTimezoneForState } from '@/lib/stateTimezone'
 
 interface EnrollmentModal {
   name: string
@@ -45,7 +14,6 @@ interface EnrollmentModal {
 export default function NewPatientPage() {
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
-  const [timezone, setTimezone] = useState('America/Chicago')
   const [state, setState] = useState('TX')
   const [isSelf, setIsSelf] = useState(false)
   const [patientConsent, setPatientConsent] = useState(false)
@@ -71,8 +39,8 @@ export default function NewPatientPage() {
         owner_id: user.id,
         name,
         phone,
-        timezone,
         state,
+        timezone: getTimezoneForState(state),
         is_self: isSelf,
         enrollment_status: enrollmentStatus,
       })
@@ -169,35 +137,23 @@ export default function NewPatientPage() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Timezone</label>
-            <select
-              value={timezone}
-              onChange={e => setTimezone(e.target.value)}
-              className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-teal-500 text-lg"
-            >
-              {TIMEZONES.map(tz => (
-                <option key={tz.value} value={tz.value}>{tz.label}</option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">State</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">State *</label>
             <select
               value={state}
               onChange={e => setState(e.target.value)}
+              required
               className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-teal-500 text-lg"
             >
-              {US_STATES.map(([code, label]) => (
-                <option key={code} value={code}>
-                  {ALL_PARTY_STATES.has(code) ? `⚠️ ${label}` : label}
+              {US_STATES.map(({ abbr, name: stateName }) => (
+                <option key={abbr} value={abbr}>
+                  {TWO_PARTY_CONSENT_STATES.has(abbr) ? `⚠️ ${stateName}` : stateName}
                 </option>
               ))}
             </select>
-            {ALL_PARTY_STATES.has(state) && (
+            {TWO_PARTY_CONSENT_STATES.has(state) && (
               <p className="text-xs text-amber-600 mt-1.5 flex items-start gap-1">
                 <span>⚠️</span>
-                <span>{STATE_NAMES[state] || state} requires all-party consent. A recording disclosure will be played automatically at the start of each call.</span>
+                <span>{US_STATES.find(s => s.abbr === state)?.name ?? state} requires all-party consent. A recording disclosure will be played automatically at the start of each call.</span>
               </p>
             )}
           </div>

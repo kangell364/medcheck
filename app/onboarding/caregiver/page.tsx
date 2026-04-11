@@ -3,12 +3,14 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { US_STATES, getTimezoneForState } from '@/lib/stateTimezone'
 
 export default function CaregiverOnboardingPage() {
   const [myName, setMyName] = useState('')
   const [myPhone, setMyPhone] = useState('')
   const [patientName, setPatientName] = useState('')
   const [patientPhone, setPatientPhone] = useState('')
+  const [patientState, setPatientState] = useState('TX')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const router = useRouter()
@@ -36,8 +38,9 @@ export default function CaregiverOnboardingPage() {
         owner_id: user.id,
         name: patientName,
         phone: patientPhone,
+        state: patientState,
+        timezone: getTimezoneForState(patientState),
         is_self: false,
-        timezone: 'America/Chicago',
       })
       .select()
       .single()
@@ -116,6 +119,20 @@ export default function CaregiverOnboardingPage() {
                 className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-teal-500 text-lg bg-white"
                 placeholder="+1 (555) 000-0000"
               />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Patient State *</label>
+              <select
+                value={patientState}
+                onChange={e => setPatientState(e.target.value)}
+                required
+                className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-teal-500 text-lg bg-white"
+              >
+                {US_STATES.map(({ abbr, name: stateName }) => (
+                  <option key={abbr} value={abbr}>{stateName}</option>
+                ))}
+              </select>
+              <p className="text-xs text-gray-400 mt-1">Used to set reminder timezone</p>
             </div>
           </div>
 

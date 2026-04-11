@@ -3,10 +3,12 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { US_STATES, getTimezoneForState } from '@/lib/stateTimezone'
 
 export default function SelfOnboardingPage() {
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
+  const [state, setState] = useState('TX')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const router = useRouter()
@@ -30,8 +32,9 @@ export default function SelfOnboardingPage() {
         owner_id: user.id,
         name,
         phone,
+        state,
+        timezone: getTimezoneForState(state),
         is_self: true,
-        timezone: 'America/Chicago',
         enrollment_status: 'active',
       })
       .select()
@@ -77,6 +80,20 @@ export default function SelfOnboardingPage() {
               placeholder="+1 (555) 000-0000"
             />
             <p className="text-xs text-gray-400 mt-1">We will call this number with your reminders</p>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">State *</label>
+            <select
+              value={state}
+              onChange={e => setState(e.target.value)}
+              required
+              className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-teal-500 text-lg"
+            >
+              {US_STATES.map(({ abbr, name: stateName }) => (
+                <option key={abbr} value={abbr}>{stateName}</option>
+              ))}
+            </select>
+            <p className="text-xs text-gray-400 mt-1">Used to set your reminder timezone</p>
           </div>
 
           {error && (

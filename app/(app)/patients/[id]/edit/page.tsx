@@ -4,16 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
-
-const TIMEZONES: { value: string; label: string }[] = [
-  { value: 'America/New_York', label: 'Eastern (ET)' },
-  { value: 'America/Chicago', label: 'Central (CT)' },
-  { value: 'America/Denver', label: 'Mountain (MT)' },
-  { value: 'America/Phoenix', label: 'Arizona — no DST (MST)' },
-  { value: 'America/Los_Angeles', label: 'Pacific (PT)' },
-  { value: 'America/Anchorage', label: 'Alaska (AKT)' },
-  { value: 'Pacific/Honolulu', label: 'Hawaii (HST)' },
-]
+import { US_STATES, TWO_PARTY_CONSENT_STATES, getTimezoneForState } from '@/lib/stateTimezone'
 
 type ContactMethod = 'call' | 'text' | 'both'
 
@@ -31,7 +22,7 @@ export default function EditPatientPage() {
 
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
-  const [timezone, setTimezone] = useState('America/Chicago')
+  const [state, setState] = useState('TX')
 
   // Reminder preferences
   const [remindersEnabled, setRemindersEnabled] = useState(true)
@@ -65,7 +56,7 @@ export default function EditPatientPage() {
 
       setName(patient.name)
       setPhone(patient.phone)
-      setTimezone(patient.timezone)
+      setState(patient.state ?? 'TX')
 
       // Reminder preferences — fall back to safe defaults if columns not yet present
       setRemindersEnabled(patient.reminders_enabled ?? true)
@@ -91,7 +82,7 @@ export default function EditPatientPage() {
       body: JSON.stringify({
         name,
         phone,
-        timezone,
+        state,
         reminders_enabled: remindersEnabled,
         contact_method: contactMethod,
         // Send as HH:MM:SS for Postgres TIME column
@@ -157,16 +148,25 @@ export default function EditPatientPage() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Timezone</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">State *</label>
             <select
-              value={timezone}
-              onChange={e => setTimezone(e.target.value)}
+              value={state}
+              onChange={e => setState(e.target.value)}
+              required
               className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-teal-500 text-lg"
             >
-              {TIMEZONES.map(tz => (
-                <option key={tz.value} value={tz.value}>{tz.label}</option>
+              {US_STATES.map(({ abbr, name: stateName }) => (
+                <option key={abbr} value={abbr}>
+                  {TWO_PARTY_CONSENT_STATES.has(abbr) ? `⚠️ ${stateName}` : stateName}
+                </option>
               ))}
             </select>
+            {TWO_PARTY_CONSENT_STATES.has(state) && (
+              <p className="text-xs text-amber-600 mt-1.5 flex items-start gap-1">
+                <span>⚠️</span>
+                <span>{US_STATES.find(s => s.abbr === state)?.name ?? state} requires all-party consent. A recording disclosure will be played automatically at the start of each call.</span>
+              </p>
+            )}
           </div>
 
           {/* ── Reminder Preferences ──────────────────────── */}
@@ -237,7 +237,7 @@ export default function EditPatientPage() {
                   className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-teal-500 text-lg"
                 />
                 <p className="text-xs text-gray-400 mt-1">
-                  Reminders are sent in the patient&apos;s timezone ({TIMEZONES.find(tz => tz.value === timezone)?.label ?? timezone})
+                  Reminders are sent in the patient&apos;s timezone ({getTimezoneForState(state)})
                 </p>
               </div>
             </div>
