@@ -60,6 +60,8 @@ export default function MyMedsClient({
   upcomingAppointments = [],
   patientTimezone = 'America/Chicago',
   todayLocalStr,
+  showPasswordNudge = false,
+  token,
 }: Props) {
   const supabase = createClient()
   const now = new Date()
@@ -209,6 +211,21 @@ export default function MyMedsClient({
           </button>
         </div>
       </div>
+
+      {/* Password nudge banner — shown when user skipped account creation */}
+      {showPasswordNudge && token && (
+        <div className="bg-amber-50 border-b border-amber-200 px-5 py-3 flex items-center justify-between gap-3">
+          <span className="text-lg text-amber-800 leading-snug">
+            🔒 Your info is protected by your personal link.
+          </span>
+          <a
+            href={`/p/${token}?createAccount=1`}
+            className="flex-shrink-0 text-lg font-semibold text-teal-700 underline whitespace-nowrap"
+          >
+            Create a password →
+          </a>
+        </div>
+      )}
 
       {/* Notification Prefs Modal */}
       {showPrefsModal && (

@@ -1,7 +1,7 @@
 import { createAdminClient } from '@/lib/supabase/admin'
 import { cookies } from 'next/headers'
 import { Medication, DoseLog, Patient } from '@/lib/types'
-import PatientPageClient from '@/components/PatientPageClient'
+import PatientOnboarding from './PatientOnboarding'
 
 interface PageProps {
   params: Promise<{ token: string }>
@@ -43,9 +43,7 @@ export default async function PatientTokenPage({ params }: PageProps) {
   })
 
   const firstName = patient.name.split(' ')[0]
-  const hasConsented = !!patient.terms_accepted_at
-  const hasAccount = !!patient.user_id
-  const patientEmail: string = patient.email ?? ''
+  const patientEmail: string = (patient as Patient & { email?: string | null }).email ?? ''
 
   // Get caregiver name
   let caregiverName = 'Your caregiver'
@@ -58,7 +56,7 @@ export default async function PatientTokenPage({ params }: PageProps) {
     caregiverName = caregiverProfile.full_name
   }
 
-  // Always load meds data (needed once consent is given)
+  // Load medications data
   const { data: medications } = await supabase
     .from('medications')
     .select('*')
@@ -112,18 +110,20 @@ export default async function PatientTokenPage({ params }: PageProps) {
     }
   }
 
+  // Enrich patient with email for onboarding component
+  const enrichedPatient = {
+    ...patient,
+    email: patientEmail,
+  }
+
   return (
-    <PatientPageClient
-      patient={patient}
-      token={token}
+    <PatientOnboarding
+      patient={enrichedPatient}
       firstName={firstName}
       caregiverName={caregiverName}
       medications={medications || []}
       todayLogs={todayLogs || []}
       streak={streak}
-      hasConsented={hasConsented}
-      hasAccount={hasAccount}
-      patientEmail={patientEmail}
     />
   )
 }

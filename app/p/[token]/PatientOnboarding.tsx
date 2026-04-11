@@ -1,36 +1,26 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useSearchParams } from 'next/navigation'
 import { Medication, DoseLog, Patient } from '@/lib/types'
-import MyMedsClient from '@/app/(app)/my-meds/MyMedsClient'
 import ConsentScreenClient from '@/components/ConsentScreenClient'
 import InstallStep from '@/components/InstallStep'
 import AccountStep from '@/components/AccountStep'
+import MyMedsClient from '@/app/(app)/my-meds/MyMedsClient'
 
-interface UpcomingAppointment {
-  id: string
-  appointment_date: string
-  appointment_time: string
-  appointment_type: string
-  doctor_name: string
-  location?: string | null
-}
-
-interface Props {
-  patient: Patient & { permanent_token: string; terms_accepted_at: string | null }
-  token: string
+export interface PatientOnboardingData {
+  patient: Patient & {
+    permanent_token: string
+    terms_accepted_at: string | null
+    email?: string | null
+    user_id?: string | null
+  }
   firstName: string
   caregiverName: string
   medications: Medication[]
   todayLogs: DoseLog[]
   streak: number
-  upcomingAppointments?: UpcomingAppointment[]
   patientTimezone?: string
   todayLocalStr?: string
-  hasConsented: boolean
-  hasAccount: boolean
-  patientEmail: string
 }
 
 type Step = 'consent' | 'install' | 'account' | 'meds'
@@ -50,59 +40,47 @@ function isAccountSkipped(): boolean {
   return localStorage.getItem('rxnudge_account_skipped') === '1'
 }
 
-/** Determine which step to show after consent is confirmed */
 function stepAfterConsent(hasAccount: boolean): Step {
   if (isStandalone() || isInstallDismissed()) {
-    // Skip install step
     if (hasAccount || isAccountSkipped()) return 'meds'
     return 'account'
   }
   return 'install'
 }
 
-export default function PatientPageClient({
+export default function PatientOnboarding({
   patient,
-  token,
   firstName,
   caregiverName,
   medications,
   todayLogs,
   streak,
-  upcomingAppointments,
   patientTimezone,
   todayLocalStr,
-  hasConsented,
-  hasAccount,
-  patientEmail,
-}: Props) {
-  const searchParams = useSearchParams()
-  const forceAccount = searchParams?.get('createAccount') === '1'
+}: PatientOnboardingData) {
+  const hasConsented = !!patient.terms_accepted_at
+  const hasAccount = !!patient.user_id
+  const patientEmail = patient.email ?? ''
+  const token = patient.permanent_token
 
   const [step, setStep] = useState<Step>(() => {
     if (!hasConsented) return 'consent'
-    // Server doesn't know localStorage — start at install, useEffect refines it
+    // Start at install; useEffect will refine based on localStorage
     return 'install'
   })
 
-  // Refine step on client after localStorage is available
+  // Refine step client-side once localStorage is available
   useEffect(() => {
     if (!hasConsented) return
-    // ?createAccount=1 forces the account step regardless of skip flag
-    if (forceAccount && !hasAccount) {
-      setStep('account')
-      return
-    }
-    const refined = stepAfterConsent(hasAccount)
-    setStep(refined)
-  }, [hasConsented, hasAccount, forceAccount])
+    setStep(stepAfterConsent(hasAccount))
+  }, [hasConsented, hasAccount])
 
-  // ── Consent ────────────────────────────────────────────────────────────────
+  // ── Consent ──────────────────────────────────────────────────────────────
   const handleConsentAccepted = () => {
-    const next = stepAfterConsent(hasAccount)
-    setStep(next)
+    setStep(stepAfterConsent(hasAccount))
   }
 
-  // ── Install ─────────────────────────────────────────────────────────────────
+  // ── Install ───────────────────────────────────────────────────────────────
   const handleInstallDone = () => {
     if (hasAccount || isAccountSkipped()) {
       setStep('meds')
@@ -111,7 +89,7 @@ export default function PatientPageClient({
     }
   }
 
-  // ── Account ─────────────────────────────────────────────────────────────────
+  // ── Account ───────────────────────────────────────────────────────────────
   const handleAccountDone = () => setStep('meds')
 
   const handleAccountSkip = () => {
@@ -119,7 +97,7 @@ export default function PatientPageClient({
     setStep('meds')
   }
 
-  // ── Render ──────────────────────────────────────────────────────────────────
+  // ── Render ────────────────────────────────────────────────────────────────
   if (step === 'consent') {
     return (
       <ConsentScreenClient
@@ -155,7 +133,6 @@ export default function PatientPageClient({
       todayLogs={todayLogs}
       streak={streak}
       firstName={firstName}
-      upcomingAppointments={upcomingAppointments}
       patientTimezone={patientTimezone}
       todayLocalStr={todayLocalStr}
       showPasswordNudge={!hasAccount && isAccountSkipped()}
