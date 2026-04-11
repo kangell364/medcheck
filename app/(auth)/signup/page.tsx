@@ -8,6 +8,7 @@ import { createClient } from '@/lib/supabase/client'
 export default function SignupPage() {
   const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
+  const [phone, setPhone] = useState('')
   const [password, setPassword] = useState('')
   const [agreedToTerms, setAgreedToTerms] = useState(false)
   const [error, setError] = useState('')
@@ -39,6 +40,7 @@ export default function SignupPage() {
       await supabase.from('profiles').upsert({
         id: data.user.id,
         full_name: fullName,
+        phone: phone || null,
         user_type: 'caregiver',
       })
       router.push('/onboarding')
@@ -79,6 +81,19 @@ export default function SignupPage() {
               className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-teal-500 text-lg"
               placeholder="you@example.com"
             />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Phone Number <span className="text-gray-400 font-normal">(optional)</span>
+            </label>
+            <input
+              type="tel"
+              value={phone}
+              onChange={e => setPhone(e.target.value)}
+              className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-teal-500 text-lg"
+              placeholder="+1 (555) 000-0000"
+            />
+            <p className="text-xs text-gray-400 mt-1">Used for medication alerts. SMS verification coming soon.</p>
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
