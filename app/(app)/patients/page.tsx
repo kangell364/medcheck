@@ -1,10 +1,11 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { Patient } from '@/lib/types'
+import { Toast, useToast } from '@/components/Toast'
 
 export default function PatientsPage() {
   const [patients, setPatients] = useState<Patient[]>([])
@@ -12,11 +13,17 @@ export default function PatientsPage() {
   const [pendingPopup, setPendingPopup] = useState<Patient | null>(null)
   const supabase = createClient()
   const router = useRouter()
+  const { toasts, addToast, dismissToast } = useToast()
+  // Track previous enrollment statuses to detect transitions to 'active'
+  const prevStatusRef = useRef<Record<string, string>>({})
 
   useEffect(() => {
+    let userId: string | null = null
+
     async function load() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
+      userId = user.id
 
       const { data } = await supabase
         .from('patients')
@@ -24,9 +31,59 @@ export default function PatientsPage() {
         .eq('owner_id', user.id)
         .order('created_at', { ascending: true })
 
-      setPatients((data as Patient[]) || [])
+      const loaded = (data as Patient[]) || []
+      setPatients(loaded)
       setLoading(false)
+
+      // Seed previous status map
+      const statusMap: Record<string, string> = {}
+      for (const p of loaded) {
+        statusMap[p.id] = p.enrollment_status
+      }
+      prevStatusRef.current = statusMap
+
+      // Subscribe to real-time changes on patients for this caregiver
+      // NOTE: Requires the patients table to be in the supabase_realtime publication.
+      // See supabase/migrations/20260411270000_enable_realtime.sql
+      const channel = supabase
+        .channel('members-status')
+        .on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'patients',
+            filter: `owner_id=eq.${user.id}`,
+          },
+          (payload) => {
+            const updated = payload.new as Patient
+
+            // Detect pending → active transition and show toast
+            const prevStatus = prevStatusRef.current[updated.id]
+            if (prevStatus === 'pending' && updated.enrollment_status === 'active') {
+              addToast(`✅ ${updated.name} has accepted their enrollment! Their profile is now active.`)
+            }
+
+            // Update status tracking map
+            prevStatusRef.current = {
+              ...prevStatusRef.current,
+              [updated.id]: updated.enrollment_status,
+            }
+
+            // Update local state
+            setPatients((prev) =>
+              prev.map((m) => (m.id === updated.id ? { ...m, ...updated } : m))
+            )
+          }
+        )
+        .subscribe()
+
+      // Cleanup on unmount
+      return () => {
+        supabase.removeChannel(channel)
+      }
     }
+
     load()
   }, [])
 
@@ -46,6 +103,9 @@ export default function PatientsPage() {
 
   return (
     <div className="max-w-3xl mx-auto pb-20 md:pb-0">
+      {/* Toast notifications */}
+      <Toast toasts={toasts} onDismiss={dismissToast} />
+
       {/* Pending enrollment popup */}
       {pendingPopup && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">

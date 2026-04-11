@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
 import { Patient, Medication, DoseLog } from '@/lib/types'
 import DashboardGreeting from '@/components/DashboardGreeting'
+import DashboardRealtimeSync from '@/components/DashboardRealtimeSync'
 
 function formatApptDateTime(dateStr: string, timeStr: string): string {
   const dt = new Date(`${dateStr}T${timeStr}`)
@@ -130,6 +131,13 @@ export default async function DashboardPage() {
     <div className="max-w-4xl mx-auto pb-20 md:pb-0">
       {/* Header — client component so greeting/date use the user's browser timezone */}
       <DashboardGreeting displayName={displayName} />
+
+      {/* Real-time subscription: auto-refresh when a member's enrollment_status changes.
+          Renders a toast when a pending member becomes active. */}
+      <DashboardRealtimeSync
+        userId={user!.id}
+        patients={(patients || []).map(p => ({ id: p.id, name: p.name, enrollment_status: p.enrollment_status }))}
+      />
 
       {/* No patients yet */}
       {(!patients || patients.length === 0) && (
