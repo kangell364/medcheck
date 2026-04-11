@@ -115,7 +115,12 @@ export default async function PatientDetailPage({
         </Link>
         <div className="flex items-start justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">{patient.name}</h1>
+            <div className="flex items-center gap-2">
+              <h1 className="text-3xl font-bold text-gray-900">{patient.name}</h1>
+              <Link href={`/patients/${id}/edit`} className="text-sm text-gray-400 hover:text-teal-600 transition-colors">
+                ✏️ Edit
+              </Link>
+            </div>
             <p className="text-gray-500">{patient.phone} • {patient.timezone}</p>
           </div>
           <TriggerCallButton
@@ -175,7 +180,7 @@ export default async function PatientDetailPage({
                         {(med as any).nickname && (
                           <p className="text-base text-teal-600 font-medium">&quot;{(med as any).nickname}&quot;</p>
                         )}
-                        {med.dosage && <p className="text-base text-gray-600">{med.dosage}</p>}
+                        {med.dosage && /[a-zA-Z]/.test(med.dosage) && <p className="text-base text-gray-600">{med.dosage}</p>}
                         <div className="flex flex-wrap gap-2 mt-2">
                           {med.reminder_times.map(t => (
                             <span key={t} className="text-sm font-semibold bg-white/80 px-3 py-1 rounded-full text-gray-700 border border-gray-200">
