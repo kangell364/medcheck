@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { logEvent } from '@/lib/logEvent'
 
 export async function PATCH(
   request: NextRequest,
@@ -41,6 +42,15 @@ export async function PATCH(
   if (!data) {
     return NextResponse.json({ error: 'Patient not found or access denied' }, { status: 404 })
   }
+
+  // Log patient updated event
+  await logEvent({
+    patientId: id,
+    ownerId: user.id,
+    eventType: 'patient_updated',
+    patientName: name,
+    internalDetails: { updatedFields: { name, phone, timezone } },
+  })
 
   return NextResponse.json(data)
 }

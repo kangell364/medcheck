@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import twilio from 'twilio'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { adminLogEvent } from '@/lib/logEvent'
 
 export async function POST(request: NextRequest) {
   try {
@@ -35,10 +36,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Create dose log entries for today.
-    // Use midnight in the patient's timezone as the canonical "scheduled_at" for today.
     const patientTimezone: string = patient.timezone || 'America/Chicago'
-    const todayDateInPatientTz = new Date().toLocaleDateString('en-CA', { timeZone: patientTimezone }) // YYYY-MM-DD
-    // Compute the UTC timestamp for midnight in the patient's timezone
+    const todayDateInPatientTz = new Date().toLocaleDateString('en-CA', { timeZone: patientTimezone })
     const utcMidnight = new Date(`${todayDateInPatientTz}T00:00:00.000Z`)
     const offsetMs = utcMidnight.getTime() - new Date(utcMidnight.toLocaleString('en-US', { timeZone: patientTimezone })).getTime()
     const scheduledAt = new Date(utcMidnight.getTime() + offsetMs)
@@ -65,12 +64,34 @@ export async function POST(request: NextRequest) {
     const voiceUrl = `${appUrl}/api/twilio/voice?patientId=${patientId}`
     const statusUrl = `${appUrl}/api/twilio/status`
 
-    const call = await client.calls.create({
-      to: patient.phone,
-      from: process.env.TWILIO_PHONE_NUMBER!,
-      url: voiceUrl,
-      statusCallback: statusUrl,
-      statusCallbackMethod: 'POST',
+    let call: Awaited<ReturnType<typeof client.calls.create>>
+    try {
+      call = await client.calls.create({
+        to: patient.phone,
+        from: process.env.TWILIO_PHONE_NUMBER!,
+        url: voiceUrl,
+        statusCallback: statusUrl,
+        statusCallbackMethod: 'POST',
+      })
+    } catch (err: any) {
+      console.error('Outbound call error:', err)
+      await adminLogEvent({
+        patientId,
+        ownerId: patient.owner_id,
+        eventType: 'call_failed',
+        patientName: patient.name,
+        internalDetails: { error: err.message, code: err.code, status: err.status },
+      })
+      return NextResponse.json({ error: err.message }, { status: 500 })
+    }
+
+    // Log call placed
+    await adminLogEvent({
+      patientId,
+      ownerId: patient.owner_id,
+      eventType: 'call_placed',
+      patientName: patient.name,
+      internalDetails: { callSid: call.sid },
     })
 
     return NextResponse.json({ success: true, callSid: call.sid })

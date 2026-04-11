@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import twilio from 'twilio'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { adminLogEvent } from '@/lib/logEvent'
 
 export async function POST(request: NextRequest) {
   try {
@@ -47,19 +48,30 @@ export async function POST(request: NextRequest) {
             body: message,
           })
           sentTo.push(`SMS:${contact.phone}`)
-        } catch (e) {
+        } catch (e: any) {
           console.error('SMS send error:', e)
+          await adminLogEvent({
+            patientId,
+            ownerId: patient.owner_id,
+            eventType: 'sms_failed',
+            patientName: patient.name,
+            medicationId: medicationId || undefined,
+            medicationName: medName !== 'a medication' ? medName : undefined,
+            internalDetails: { error: e.message, code: e.code, status: e.status },
+          })
         }
       }
     }
 
-    // Log the alert
-    await supabase.from('alert_log').insert({
-      patient_id: patientId,
-      medication_id: medicationId || null,
-      alert_type: 'missed_dose',
-      message,
-      sent_to: sentTo.join(', ') || 'nobody',
+    // Log the missed dose event using logEvent
+    await adminLogEvent({
+      patientId,
+      ownerId: patient.owner_id,
+      eventType: 'missed_dose',
+      patientName: patient.name,
+      medicationId: medicationId || undefined,
+      medicationName: medName !== 'a medication' ? medName : undefined,
+      sentTo: sentTo.join(', ') || 'nobody',
     })
 
     return NextResponse.json({ success: true, alertsSent: sentTo.length })
@@ -71,23 +83,10 @@ export async function POST(request: NextRequest) {
 
 /**
  * Get the start-of-day UTC timestamp for a given IANA timezone.
- * e.g. for America/New_York on 2026-04-10, returns the UTC equivalent of
- * midnight Eastern time on that date.
  */
 function startOfDayInTz(timezone: string): Date {
-  // Get the current date components in the patient's timezone
-  const nowInTz = new Date().toLocaleString('en-US', { timeZone: timezone })
-  const d = new Date(nowInTz)
-  d.setHours(0, 0, 0, 0)
-  // Re-interpret as if it's that wall-clock time in UTC for comparison purposes.
-  // Actually we need the UTC instant that corresponds to midnight in the patient's timezone.
-  // Use the date string approach:
   const dateStr = new Date().toLocaleDateString('en-CA', { timeZone: timezone }) // YYYY-MM-DD
-  // Construct midnight in the patient's timezone as a UTC instant
-  const midnightLocal = new Date(`${dateStr}T00:00:00`)
-  // Adjust: find the offset at that moment by comparing the locale string
   const utcMidnight = new Date(`${dateStr}T00:00:00.000Z`)
-  // Get the actual offset for that timezone on that date
   const offsetMs = utcMidnight.getTime() - new Date(utcMidnight.toLocaleString('en-US', { timeZone: timezone })).getTime()
   return new Date(utcMidnight.getTime() + offsetMs)
 }
@@ -96,18 +95,13 @@ function startOfDayInTz(timezone: string): Date {
 export async function GET() {
   const supabase = createAdminClient()
 
-  // Fetch all active patients with their timezone so we can compute
-  // "start of today" per patient
   const { data: patients } = await supabase
     .from('patients')
     .select('id, timezone')
     .eq('active', true)
 
-  // Build the earliest possible "today start" across all patients
-  // (most western timezone = latest UTC midnight)
-  // We query a broad window and then filter per-patient below.
   const broadTodayStart = new Date()
-  broadTodayStart.setUTCHours(0, 0, 0, 0) // UTC midnight as lower bound
+  broadTodayStart.setUTCHours(0, 0, 0, 0)
 
   const { data: missedLogs } = await supabase
     .from('dose_logs')
@@ -126,17 +120,14 @@ export async function GET() {
   for (const log of (missedLogs || [])) {
     const patientTimezone: string = (log.patients as any)?.timezone || 'America/Chicago'
 
-    // Determine start-of-today in the patient's timezone
     const patientTodayStart = startOfDayInTz(patientTimezone)
     const scheduledAt = new Date(log.scheduled_at)
 
-    // Only alert if the scheduled dose is within today's window for this patient
     if (scheduledAt < patientTodayStart) {
       processed.push({ logId: log.id, ok: false, reason: 'not_today_in_patient_tz' })
       continue
     }
 
-    // Also check: the scheduled time has actually passed in the patient's timezone
     const nowInPatientTz = new Date(new Date().toLocaleString('en-US', { timeZone: patientTimezone }))
     const scheduledInPatientTz = new Date(scheduledAt.toLocaleString('en-US', { timeZone: patientTimezone }))
 

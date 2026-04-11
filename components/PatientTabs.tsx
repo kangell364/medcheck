@@ -8,6 +8,8 @@ import ManualLogButton from '@/components/ManualLogButton'
 import DeleteMedButton from '@/components/DeleteMedButton'
 import DeleteDoctorButton from '@/components/DeleteDoctorButton'
 import PatientHistory from '@/components/PatientHistory'
+import RecentActivityList from '@/components/RecentActivityList'
+import { AlertLog } from '@/lib/types'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -40,6 +42,7 @@ interface PatientTabsProps {
   pendingCallbacks: any[]
   appointments: Appointment[]
   doctors: Doctor[]
+  recentAlerts?: AlertLog[]
 }
 
 type TabId = 'medications' | 'doctors' | 'appointments' | 'contacts' | 'history'
@@ -107,6 +110,7 @@ export default function PatientTabs({
   pendingCallbacks,
   appointments,
   doctors,
+  recentAlerts = [],
 }: PatientTabsProps) {
   const searchParams = useSearchParams()
   const router = useRouter()
@@ -475,6 +479,9 @@ export default function PatientTabs({
               ))}
             </div>
           )}
+
+          {/* Recent Activity */}
+          <RecentActivityList patientId={patient.id} recentAlerts={recentAlerts} />
         </section>
       )}
 

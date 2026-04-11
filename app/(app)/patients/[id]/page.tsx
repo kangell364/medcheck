@@ -68,6 +68,14 @@ export default async function PatientDetailPage({
     .eq('owner_id', user!.id)
     .order('created_at', { ascending: true })
 
+  // Fetch last 5 alert_log entries for this patient
+  const { data: recentAlerts } = await supabase
+    .from('alert_log')
+    .select('*')
+    .eq('patient_id', id)
+    .order('sent_at', { ascending: false })
+    .limit(5)
+
   return (
     <div className="max-w-3xl mx-auto pb-20 md:pb-0">
       {/* Patient Header */}
@@ -108,6 +116,7 @@ export default async function PatientDetailPage({
         pendingCallbacks={pendingCallbacks || []}
         appointments={appointments || []}
         doctors={doctors || []}
+        recentAlerts={recentAlerts || []}
       />
     </div>
   )

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import twilio from 'twilio'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { adminLogEvent } from '@/lib/logEvent'
 
 const VoiceResponse = twilio.twiml.VoiceResponse
 
@@ -49,7 +50,6 @@ export async function POST(request: NextRequest) {
   // Transcribe with Whisper via OpenRouter
   let transcript = ''
   try {
-    // Download recording from Twilio (add .mp3 extension)
     const mp3Url = recordingUrl.endsWith('.mp3') ? recordingUrl : `${recordingUrl}.mp3`
     const audioResponse = await fetch(mp3Url, {
       headers: {
@@ -129,6 +129,20 @@ export async function POST(request: NextRequest) {
         medication_id: currentMed?.id || null,
         scheduled_for: scheduledFor.toISOString(),
       })
+
+      // Log callback scheduled
+      if (patient) {
+        await adminLogEvent({
+          patientId,
+          ownerId: patient.owner_id,
+          eventType: 'callback_scheduled',
+          patientName: patient.name,
+          medicationId: currentMed?.id,
+          medicationName: currentMed?.name,
+          internalDetails: { callbackId, scheduledFor: scheduledFor.toISOString() },
+        })
+      }
+
       twiml.say({ voice: 'Polly.Joanna' }, 'Great! I will call you back in one hour. Goodbye!')
     } else {
       twiml.say({ voice: 'Polly.Joanna' }, 'Okay, no problem. Take care and goodbye!')
@@ -138,9 +152,8 @@ export async function POST(request: NextRequest) {
   }
 
   // Handle dose logging based on intent.
-  // Use midnight in the patient's timezone as the canonical scheduled_at for today.
   const patientTimezone: string = patient?.timezone || 'America/Chicago'
-  const todayDateInPatientTz = new Date().toLocaleDateString('en-CA', { timeZone: patientTimezone }) // YYYY-MM-DD
+  const todayDateInPatientTz = new Date().toLocaleDateString('en-CA', { timeZone: patientTimezone })
   const utcMidnight = new Date(`${todayDateInPatientTz}T00:00:00.000Z`)
   const tzOffsetMs = utcMidnight.getTime() - new Date(utcMidnight.toLocaleString('en-US', { timeZone: patientTimezone })).getTime()
   const scheduledAt = new Date(utcMidnight.getTime() + tzOffsetMs)
@@ -160,6 +173,19 @@ export async function POST(request: NextRequest) {
         },
         { onConflict: 'patient_id,medication_id,scheduled_at' }
       )
+
+      // Log dose confirmed via call
+      if (patient) {
+        await adminLogEvent({
+          patientId,
+          ownerId: patient.owner_id,
+          eventType: 'dose_confirmed_call',
+          patientName: patient.name,
+          medicationId: currentMed.id,
+          medicationName: currentMed.name,
+          internalDetails: { callSid, transcript },
+        })
+      }
     }
 
     // Move to next medication or hang up
@@ -176,6 +202,19 @@ export async function POST(request: NextRequest) {
       twiml.hangup()
     }
   } else if (intent === 'NO') {
+    // Log dose declined via call
+    if (patient && currentMed) {
+      await adminLogEvent({
+        patientId,
+        ownerId: patient.owner_id,
+        eventType: 'dose_declined_call',
+        patientName: patient.name,
+        medicationId: currentMed.id,
+        medicationName: currentMed.name,
+        internalDetails: { callSid, transcript },
+      })
+    }
+
     // Ask if they want a callback
     const confirmUrl = `${APP_URL}/api/twilio/transcribe?patientId=${patientId}&medIndex=${medIndex}&callbackConfirm=true`
     twiml.say(
@@ -207,6 +246,19 @@ export async function POST(request: NextRequest) {
         },
         { onConflict: 'patient_id,medication_id,scheduled_at' }
       )
+
+      // Log missed dose (uncertain response treated as missed)
+      if (patient) {
+        await adminLogEvent({
+          patientId,
+          ownerId: patient.owner_id,
+          eventType: 'missed_dose',
+          patientName: patient.name,
+          medicationId: currentMed.id,
+          medicationName: currentMed.name,
+          internalDetails: { callSid, transcript, reason: 'uncertain_response' },
+        })
+      }
     }
 
     // Notify family contacts via SMS

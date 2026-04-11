@@ -63,6 +63,14 @@ export interface AlertLog {
   message: string | null
   sent_to: string | null
   sent_at: string
+  // v2 fields
+  event_type?: string | null
+  patient_name?: string | null
+  medication_name?: string | null
+  display_message?: string | null
+  internal_details?: Record<string, unknown> | null
+  severity?: 'info' | 'warning' | 'error' | 'success' | null
+  owner_id?: string | null
 }
 
 // Extended types with relations

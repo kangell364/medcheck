@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { logEvent } from '@/lib/logEvent'
 
 export async function PATCH(
   req: NextRequest,
@@ -16,7 +17,7 @@ export async function PATCH(
   // Verify ownership: medication → patient → owner_id = user.id
   const { data: medication } = await supabase
     .from('medications')
-    .select('id, patient_id')
+    .select('id, patient_id, name')
     .eq('id', medId)
     .single()
 
@@ -26,7 +27,7 @@ export async function PATCH(
 
   const { data: patient } = await supabase
     .from('patients')
-    .select('owner_id')
+    .select('owner_id, name')
     .eq('id', medication.patient_id)
     .single()
 
@@ -54,6 +55,17 @@ export async function PATCH(
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 
+  // Log med edited event
+  await logEvent({
+    patientId: medication.patient_id,
+    ownerId: user.id,
+    eventType: 'med_edited',
+    patientName: (patient as any).name,
+    medicationId: medId,
+    medicationName: name || medication.name,
+    internalDetails: { previousName: medication.name, updatedFields: { name, nickname, dosage, reminder_times, notes } },
+  })
+
   return NextResponse.json({ medication: data })
 }
 
@@ -72,7 +84,7 @@ export async function DELETE(
   // Verify ownership: medication → patient → owner_id = user.id
   const { data: medication } = await supabase
     .from('medications')
-    .select('id, patient_id')
+    .select('id, patient_id, name')
     .eq('id', medId)
     .single()
 
@@ -82,7 +94,7 @@ export async function DELETE(
 
   const { data: patient } = await supabase
     .from('patients')
-    .select('owner_id')
+    .select('owner_id, name')
     .eq('id', medication.patient_id)
     .single()
 
@@ -114,6 +126,17 @@ export async function DELETE(
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
+
+  // Log med deleted event
+  await logEvent({
+    patientId: medication.patient_id,
+    ownerId: user.id,
+    eventType: 'med_deleted',
+    patientName: (patient as any).name,
+    medicationId: medId,
+    medicationName: medication.name,
+    internalDetails: { keepHistory, medId },
+  })
 
   return NextResponse.json({ success: true })
 }

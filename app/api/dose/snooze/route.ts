@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { adminLogEvent } from '@/lib/logEvent'
 
 // Check if a scheduled time (HH:MM) has passed in the patient's timezone
 function isScheduledTimeDue(scheduledTime: string, patientTimezone: string): boolean {
@@ -10,7 +11,6 @@ function isScheduledTimeDue(scheduledTime: string, patientTimezone: string): boo
     const currentMinutes = patientNow.getHours() * 60 + patientNow.getMinutes()
     return currentMinutes >= scheduledMinutes
   } catch {
-    // If we can't parse, allow it through (fail open for server-side guard)
     return true
   }
 }
@@ -38,15 +38,12 @@ export async function POST(request: NextRequest) {
     }
 
     // ── Server-side validation: is the medication actually due? ──────────────
-    // Use the scheduledTime from the request body if provided; otherwise derive
-    // from the medication's reminder_times (first one as fallback).
     const timeToCheck: string | null = scheduledTime ?? (medication.reminder_times?.[0] ?? null)
 
     if (timeToCheck) {
-      // Fetch patient timezone for server-side validation
       const { data: patient } = await supabase
         .from('patients')
-        .select('timezone')
+        .select('timezone, owner_id, name')
         .eq('id', patientId)
         .single()
 
@@ -87,10 +84,28 @@ export async function POST(request: NextRequest) {
     })
 
     if (callbackError) {
-      // Log but don't fail the snooze — the snooze itself succeeded
       console.error('Callback insert error:', callbackError)
     }
     // ─────────────────────────────────────────────────────────────────────────
+
+    // Fetch patient for logging
+    const { data: patient } = await supabase
+      .from('patients')
+      .select('owner_id, name')
+      .eq('id', patientId)
+      .single()
+
+    if (patient) {
+      await adminLogEvent({
+        patientId,
+        ownerId: patient.owner_id,
+        eventType: 'snooze_started',
+        patientName: patient.name,
+        medicationId,
+        medicationName: medication.name ?? undefined,
+        internalDetails: { hours, snoozeUntil: snoozeUntil.toISOString() },
+      })
+    }
 
     return NextResponse.json({ success: true, snooze_until: snoozeUntil.toISOString() })
   } catch (err) {
