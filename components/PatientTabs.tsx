@@ -7,6 +7,7 @@ import { Medication, DoseLog, PatientAlert, Patient } from '@/lib/types'
 import ManualLogButton from '@/components/ManualLogButton'
 import DeleteMedButton from '@/components/DeleteMedButton'
 import DeleteDoctorButton from '@/components/DeleteDoctorButton'
+import PatientHistory from '@/components/PatientHistory'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -41,7 +42,7 @@ interface PatientTabsProps {
   doctors: Doctor[]
 }
 
-type TabId = 'medications' | 'doctors' | 'appointments' | 'contacts'
+type TabId = 'medications' | 'doctors' | 'appointments' | 'contacts' | 'history'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -202,6 +203,7 @@ export default function PatientTabs({
         <TabButton id="doctors" label="Doctors" emoji="👨‍⚕️" />
         <TabButton id="appointments" label="Appointments" emoji="📅" />
         <TabButton id="contacts" label="Contacts" emoji="🔔" />
+        <TabButton id="history" label="History" emoji="📋" />
       </div>
 
       {/* ── Tab 1: Medications ── */}
@@ -473,6 +475,17 @@ export default function PatientTabs({
               ))}
             </div>
           )}
+        </section>
+      )}
+
+      {/* ── Tab 5: History ── */}
+      {activeTab === 'history' && (
+        <section>
+          <PatientHistory
+            patientId={patient.id}
+            patientName={patient.name}
+            patientTimezone={patient.timezone}
+          />
         </section>
       )}
     </div>
