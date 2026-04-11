@@ -42,7 +42,7 @@ export async function POST(request: NextRequest) {
     await client.messages.create({
       to: patient.phone,
       from: process.env.TWILIO_PHONE_NUMBER!,
-      body: `Hi ${patientFirstName}, ${caregiverName} has enrolled you in RxNudge for daily medication reminders. Reply YES to confirm or NO to decline. Tap the attachment to save our contact! 💊`,
+      body: `Hi ${patientFirstName}, ${caregiverName} has enrolled you in RxNudge for daily medication reminders. Reply YES to confirm or NO to decline. Tap the attachment to save our contact! 💊\n\nReply STOP to opt out at any time.`,
       mediaUrl: [`${appUrl}/api/vcard`],
     })
 

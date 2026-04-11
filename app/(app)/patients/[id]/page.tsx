@@ -132,6 +132,78 @@ export default async function PatientDetailPage({
         </div>
       </div>
 
+      {/* Reminder Settings Card */}
+      <div className="mb-6 bg-white rounded-2xl border border-gray-100 p-5">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-base font-semibold text-gray-800">Reminder Settings</h2>
+          <Link
+            href={`/patients/${id}/edit`}
+            className="text-xs text-teal-600 hover:underline"
+          >
+            Edit
+          </Link>
+        </div>
+        <div className="flex flex-wrap gap-4 text-sm">
+          {/* Reminders on/off indicator */}
+          <div className="flex items-center gap-2">
+            <span
+              className={`inline-block h-2.5 w-2.5 rounded-full ${
+                patient.reminders_enabled !== false ? 'bg-emerald-400' : 'bg-gray-300'
+              }`}
+            />
+            <span className="text-gray-600">
+              Reminders:{' '}
+              <span className={`font-medium ${patient.reminders_enabled !== false ? 'text-emerald-600' : 'text-gray-500'}`}>
+                {patient.reminders_enabled !== false ? 'ON' : 'OFF'}
+              </span>
+            </span>
+          </div>
+
+          {/* Contact method */}
+          <div className="flex items-center gap-1.5 text-gray-600">
+            <span>
+              {patient.contact_method === 'call' ? '📞' : patient.contact_method === 'both' ? '📞💬' : '💬'}
+            </span>
+            <span>
+              Method:{' '}
+              <span className="font-medium text-gray-800 capitalize">
+                {patient.contact_method ?? 'Text'}
+              </span>
+            </span>
+          </div>
+
+          {/* Reminder time */}
+          <div className="flex items-center gap-1.5 text-gray-600">
+            <span>🕗</span>
+            <span>
+              Time:{' '}
+              <span className="font-medium text-gray-800">
+                {patient.reminder_time
+                  ? new Intl.DateTimeFormat('en-US', {
+                      hour: 'numeric',
+                      minute: '2-digit',
+                      hour12: true,
+                      timeZone: patient.timezone ?? 'America/Chicago',
+                    }).format(
+                      new Date(
+                        `1970-01-01T${patient.reminder_time.length === 5 ? patient.reminder_time + ':00' : patient.reminder_time}`
+                      )
+                    )
+                  : '8:00 AM'}
+              </span>
+            </span>
+          </div>
+
+          {/* SMS opt-out warning */}
+          {patient.sms_opted_out && (
+            <div className="flex items-center gap-1.5 text-amber-600">
+              <span>⚠️</span>
+              <span className="font-medium">SMS opted out</span>
+            </div>
+          )}
+        </div>
+      </div>
+
       {/* Tabbed Content */}
       <PatientTabs
         patient={patient}

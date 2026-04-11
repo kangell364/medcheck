@@ -17,6 +17,11 @@ export interface Patient {
   is_self: boolean
   active: boolean
   enrollment_status: 'pending' | 'active' | 'declined' | 'inactive'
+  reminders_enabled: boolean
+  contact_method: 'call' | 'text' | 'both'
+  reminder_time: string // HH:MM:SS format
+  sms_opted_out: boolean
+  sms_opted_out_at: string | null
   created_at: string
 }
 

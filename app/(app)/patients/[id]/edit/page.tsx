@@ -15,6 +15,14 @@ const TIMEZONES: { value: string; label: string }[] = [
   { value: 'Pacific/Honolulu', label: 'Hawaii (HST)' },
 ]
 
+type ContactMethod = 'call' | 'text' | 'both'
+
+const CONTACT_OPTIONS: { value: ContactMethod; label: string; icon: string }[] = [
+  { value: 'call', label: 'Call', icon: '📞' },
+  { value: 'text', label: 'Text', icon: '💬' },
+  { value: 'both', label: 'Both', icon: '📞💬' },
+]
+
 export default function EditPatientPage() {
   const params = useParams()
   const id = params.id as string
@@ -24,6 +32,12 @@ export default function EditPatientPage() {
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
   const [timezone, setTimezone] = useState('America/Chicago')
+
+  // Reminder preferences
+  const [remindersEnabled, setRemindersEnabled] = useState(true)
+  const [contactMethod, setContactMethod] = useState<ContactMethod>('text')
+  const [reminderTime, setReminderTime] = useState('08:00')
+
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -52,6 +66,14 @@ export default function EditPatientPage() {
       setName(patient.name)
       setPhone(patient.phone)
       setTimezone(patient.timezone)
+
+      // Reminder preferences — fall back to safe defaults if columns not yet present
+      setRemindersEnabled(patient.reminders_enabled ?? true)
+      setContactMethod((patient.contact_method as ContactMethod) ?? 'text')
+      // DB stores HH:MM:SS; <input type="time"> expects HH:MM
+      const rt: string = patient.reminder_time ?? '08:00:00'
+      setReminderTime(rt.slice(0, 5))
+
       setLoading(false)
     }
 
@@ -66,7 +88,15 @@ export default function EditPatientPage() {
     const res = await fetch(`/api/patients/${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, phone, timezone }),
+      body: JSON.stringify({
+        name,
+        phone,
+        timezone,
+        reminders_enabled: remindersEnabled,
+        contact_method: contactMethod,
+        // Send as HH:MM:SS for Postgres TIME column
+        reminder_time: `${reminderTime}:00`,
+      }),
     })
 
     if (!res.ok) {
@@ -94,11 +124,13 @@ export default function EditPatientPage() {
           ← Back to Patient
         </Link>
         <h1 className="text-3xl font-bold text-gray-900">Edit Patient</h1>
-        <p className="text-gray-500 mt-1">Update contact information</p>
+        <p className="text-gray-500 mt-1">Update contact information and reminder preferences</p>
       </div>
 
       <div className="bg-white rounded-2xl border border-gray-100 p-6">
         <form onSubmit={handleSubmit} className="space-y-5">
+
+          {/* ── Contact Information ────────────────────────── */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Full Name *</label>
             <input
@@ -121,7 +153,7 @@ export default function EditPatientPage() {
               className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-teal-500 text-lg"
               placeholder="+1 (555) 000-0000"
             />
-            <p className="text-xs text-gray-400 mt-1">This is the number we will call for reminders</p>
+            <p className="text-xs text-gray-400 mt-1">This is the number we will call or text for reminders</p>
           </div>
 
           <div>
@@ -137,13 +169,87 @@ export default function EditPatientPage() {
             </select>
           </div>
 
+          {/* ── Reminder Preferences ──────────────────────── */}
+          <div className="border-t border-gray-100 pt-5">
+            <h2 className="text-lg font-semibold text-gray-800 mb-4">Reminder Preferences</h2>
+
+            {/* Reminders toggle */}
+            <div className="flex items-center justify-between mb-5">
+              <div>
+                <p className="text-sm font-medium text-gray-700">Daily Reminders</p>
+                <p className="text-xs text-gray-400 mt-0.5">
+                  When off, no calls or texts will be sent
+                </p>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={remindersEnabled}
+                onClick={() => setRemindersEnabled(v => !v)}
+                className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2 ${
+                  remindersEnabled ? 'bg-teal-500' : 'bg-gray-300'
+                }`}
+              >
+                <span
+                  className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${
+                    remindersEnabled ? 'translate-x-6' : 'translate-x-1'
+                  }`}
+                />
+              </button>
+            </div>
+
+            {/* Contact method + time (only shown when reminders are ON) */}
+            <div className={`space-y-5 transition-opacity duration-200 ${remindersEnabled ? 'opacity-100' : 'opacity-40 pointer-events-none'}`}>
+
+              {/* Contact method segmented control */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Contact Method</label>
+                <div className="flex rounded-xl border border-gray-200 overflow-hidden">
+                  {CONTACT_OPTIONS.map((opt, idx) => (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => setContactMethod(opt.value)}
+                      className={`flex-1 flex items-center justify-center gap-1.5 py-3 text-sm font-medium transition-colors
+                        ${contactMethod === opt.value
+                          ? 'bg-teal-500 text-white'
+                          : 'bg-white text-gray-600 hover:bg-gray-50'
+                        }
+                        ${idx > 0 ? 'border-l border-gray-200' : ''}
+                      `}
+                    >
+                      <span>{opt.icon}</span>
+                      <span>{opt.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Reminder time */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Daily reminder time
+                </label>
+                <input
+                  type="time"
+                  value={reminderTime}
+                  onChange={e => setReminderTime(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-teal-500 text-lg"
+                />
+                <p className="text-xs text-gray-400 mt-1">
+                  Reminders are sent in the patient&apos;s timezone ({TIMEZONES.find(tz => tz.value === timezone)?.label ?? timezone})
+                </p>
+              </div>
+            </div>
+          </div>
+
           {error && (
             <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm">
               {error}
             </div>
           )}
 
-          <div className="flex gap-3">
+          <div className="flex gap-3 pt-1">
             <button
               type="submit"
               disabled={saving}

@@ -23,6 +23,7 @@ export type EventType =
   | 'patient_updated'
   | 'contact_added'
   | 'system_error'
+  | 'sms_sent'
   | 'sms_failed'
   | 'delivery_delayed'
 
@@ -50,6 +51,7 @@ const DISPLAY_MESSAGES: Record<EventType, string> = {
   patient_updated: 'Patient profile updated',
   contact_added: 'Alert contact added',
   system_error: 'Service temporarily unavailable — our team has been notified',
+  sms_sent: 'Medication reminder SMS sent',
   sms_failed: 'Message delivery delayed — will retry shortly',
   delivery_delayed: 'Reminder delivery delayed',
 }
@@ -75,6 +77,7 @@ const SEVERITY_MAP: Record<EventType, Severity> = {
   patient_updated: 'info',
   contact_added: 'info',
   system_error: 'error',
+  sms_sent: 'info',
   sms_failed: 'error',
   delivery_delayed: 'warning',
 }
