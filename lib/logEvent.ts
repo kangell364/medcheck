@@ -26,6 +26,10 @@ export type EventType =
   | 'sms_sent'
   | 'sms_failed'
   | 'delivery_delayed'
+  | 'call_confirmed'
+  | 'call_declined'
+  | 'call_snoozed'
+  | 'call_timeout'
 
 export type Severity = 'info' | 'warning' | 'error' | 'success'
 
@@ -54,6 +58,10 @@ const DISPLAY_MESSAGES: Record<EventType, string> = {
   sms_sent: 'Medication reminder SMS sent',
   sms_failed: 'Message delivery delayed — will retry shortly',
   delivery_delayed: 'Reminder delivery delayed',
+  call_confirmed: 'Patient confirmed medication taken via AI call',
+  call_declined: 'Patient declined medication confirmation via AI call',
+  call_snoozed: 'Patient snoozed medication reminder via AI call',
+  call_timeout: 'AI call ended without confirmation',
 }
 
 const SEVERITY_MAP: Record<EventType, Severity> = {
@@ -80,6 +88,10 @@ const SEVERITY_MAP: Record<EventType, Severity> = {
   sms_sent: 'info',
   sms_failed: 'error',
   delivery_delayed: 'warning',
+  call_confirmed: 'success',
+  call_declined: 'warning',
+  call_snoozed: 'info',
+  call_timeout: 'warning',
 }
 
 export interface LogEventParams {

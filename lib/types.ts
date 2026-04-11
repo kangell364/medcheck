@@ -32,6 +32,8 @@ export interface Medication {
   id: string
   patient_id: string
   name: string
+  /** Optional friendly name used in SMS + AI voice calls (e.g. "blue pill", "heart pill") */
+  nickname: string | null
   dosage: string | null
   frequency: 'once' | 'twice' | 'three_times'
   reminder_times: string[]
@@ -93,6 +95,24 @@ export interface PatientWithMeds extends Patient {
 export interface MedicationWithStatus extends Medication {
   todayLogs: DoseLog[]
   todayStatus: 'confirmed' | 'missed' | 'pending'
+}
+
+// Escalation engine
+export type EscalationStatus = 'pending' | 'confirmed' | 'declined' | 'missed' | 'snoozed'
+
+export interface ReminderEscalation {
+  id: string
+  patient_id: string
+  medication_ids: string[]
+  escalation_date: string // YYYY-MM-DD
+  /** 1=SMS1, 2=SMS2, 3=AI call, 4=post-snooze SMS, 5=final SMS, 6=missed */
+  step: number
+  status: EscalationStatus
+  confirmed_at: string | null
+  snoozed_until: string | null
+  caregiver_alerted: boolean
+  created_at: string
+  updated_at: string
 }
 
 // Affiliate / referral program types

@@ -130,6 +130,62 @@ export async function POST(request: NextRequest) {
       })
     }
 
+    // ── Escalation YES/NO handler (active patients) ──────────────
+    const YES_KEYWORDS = new Set(['YES', 'TOOK', 'TAKEN', 'DONE', 'YEP', 'YUP'])
+    const NO_KEYWORDS = new Set(['NO', 'NOPE', 'NOT YET', 'HAVEN\'T'])
+
+    if (YES_KEYWORDS.has(trimmed) || NO_KEYWORDS.has(trimmed)) {
+      const { data: activePatient } = await supabase
+        .from('patients')
+        .select('id, name, owner_id')
+        .eq('phone', fromNumber)
+        .eq('enrollment_status', 'active')
+        .limit(1)
+        .single()
+
+      if (activePatient) {
+        const today = new Date().toISOString().slice(0, 10)
+        const { data: escalation } = await supabase
+          .from('reminder_escalations')
+          .select('id, status')
+          .eq('patient_id', activePatient.id)
+          .eq('escalation_date', today)
+          .in('status', ['pending', 'snoozed'])
+          .limit(1)
+          .single()
+
+        if (escalation) {
+          if (YES_KEYWORDS.has(trimmed)) {
+            await supabase
+              .from('reminder_escalations')
+              .update({
+                status: 'confirmed',
+                confirmed_at: new Date().toISOString(),
+              })
+              .eq('id', escalation.id)
+
+            twiml.message(
+              '✅ Got it! Your medications have been marked as taken. Have a wonderful day! 💊'
+            )
+          } else {
+            // NO
+            await supabase
+              .from('reminder_escalations')
+              .update({ status: 'declined' })
+              .eq('id', escalation.id)
+
+            twiml.message(
+              "Understood. We've noted that. Your caregiver may follow up."
+            )
+          }
+
+          return new NextResponse(twiml.toString(), {
+            headers: { 'Content-Type': 'text/xml' },
+          })
+        }
+      }
+    }
+
     // No recognized command, no pending enrollment — empty 200
     return new NextResponse(twiml.toString(), {
       headers: { 'Content-Type': 'text/xml' },
