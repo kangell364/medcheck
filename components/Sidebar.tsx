@@ -10,6 +10,7 @@ const navItems = [
   { href: '/appointments', label: 'Appointments', icon: '📆' },
   { href: '/history', label: 'History', icon: '📅' },
   { href: '/alerts', label: 'Alerts', icon: '🔔' },
+  { href: '/affiliate', label: 'Affiliate', icon: '🤝' },
   { href: '/settings', label: 'Settings', icon: '⚙️' },
 ]
 

@@ -74,3 +74,42 @@ export interface MedicationWithStatus extends Medication {
   todayLogs: DoseLog[]
   todayStatus: 'confirmed' | 'missed' | 'pending'
 }
+
+// Affiliate / referral program types
+export interface Affiliate {
+  id: string
+  user_id: string
+  referred_by: string | null
+  referral_code: string
+  status: 'pending' | 'active' | 'suspended'
+  company_name: string | null
+  bio: string | null
+  approved_at: string | null
+  level1_rate: number
+  level2_rate: number
+  created_at: string
+}
+
+export interface Referral {
+  id: string
+  affiliate_id: string
+  referred_user_id: string
+  referral_code: string
+  signed_up_at: string
+  status: 'active' | 'churned'
+  churned_at: string | null
+  monthly_revenue: number
+}
+
+export interface AffiliateEarnings {
+  id: string
+  affiliate_id: string
+  referral_id: string
+  level: 1 | 2
+  period_month: string
+  gross_revenue: number
+  rate: number
+  earnings: number
+  status: 'pending' | 'paid'
+  paid_at: string | null
+}
