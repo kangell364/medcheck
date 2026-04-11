@@ -23,6 +23,7 @@ export default function NewPatientPage() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [enrollmentModal, setEnrollmentModal] = useState<EnrollmentModal | null>(null)
+  const [validationMsg, setValidationMsg] = useState<string | null>(null)
   const [profile, setProfile] = useState<{ full_name: string; phone: string | null; email: string } | null>(null)
   const router = useRouter()
   const supabase = createClient()
@@ -109,8 +110,33 @@ export default function NewPatientPage() {
   const isSelf = patientType === 'self'
   const canSubmit = patientType !== null && name && phone && (isSelf || patientConsent)
 
+  function getValidationMessage(): string | null {
+    if (!patientType) return 'Please select who you are adding first.'
+    if (!name) return 'Please enter a full name.'
+    if (!phone) return 'Please enter a phone number.'
+    if (!isSelf && !patientConsent) return 'Please confirm you have consent to enroll this person.'
+    return null
+  }
+
   return (
     <div className="max-w-lg mx-auto pb-20 md:pb-0">
+
+      {/* Validation warning modal */}
+      {validationMsg && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl max-w-sm w-full p-8 text-center">
+            <div className="text-5xl mb-4">⚠️</div>
+            <h2 className="text-xl font-bold text-gray-900 mb-3">Hold on!</h2>
+            <p className="text-gray-600 mb-6">{validationMsg}</p>
+            <button
+              onClick={() => setValidationMsg(null)}
+              className="w-full bg-teal-600 hover:bg-teal-700 text-white font-semibold py-3 px-6 rounded-xl text-lg transition-colors"
+            >
+              Got it
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Enrollment confirmation modal */}
       {enrollmentModal && (
@@ -207,6 +233,17 @@ export default function NewPatientPage() {
 
       </div>
 
+      {/* Add Patient button — always visible, shows popup if validation fails */}
+      {!patientType && (
+        <button
+          type="button"
+          onClick={() => setValidationMsg('Please select who you are adding first.')}
+          className="w-full bg-teal-600 hover:bg-teal-700 text-white font-semibold py-3 px-6 rounded-xl text-lg transition-colors mb-4"
+        >
+          Add Patient
+        </button>
+      )}
+
       {/* Form — only show after type selected */}
       {patientType && (
         <div className="bg-white rounded-2xl border border-gray-100 p-6">
@@ -298,9 +335,14 @@ export default function NewPatientPage() {
             )}
 
             <button
-              type="submit"
-              disabled={loading || !canSubmit}
-              className="w-full bg-teal-600 hover:bg-teal-700 text-white font-semibold py-3 px-6 rounded-xl text-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              type="button"
+              disabled={loading}
+              onClick={() => {
+                const msg = getValidationMessage()
+                if (msg) { setValidationMsg(msg); return }
+                handleSubmit(new Event('submit') as unknown as React.FormEvent)
+              }}
+              className="w-full bg-teal-600 hover:bg-teal-700 text-white font-semibold py-3 px-6 rounded-xl text-lg transition-colors disabled:opacity-50"
             >
               {loading ? 'Adding patient…' : 'Add Patient'}
             </button>
