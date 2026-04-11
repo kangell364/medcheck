@@ -53,6 +53,10 @@ export interface Patient {
   terms_accepted_ip?: string | null
   terms_version?: string | null
   sms_consent_at?: string | null
+  /** Notification preferences */
+  notification_style?: 'silent' | 'normal' | 'alarm'
+  notification_volume?: number
+  notification_sound?: string
   created_at: string
 }
 

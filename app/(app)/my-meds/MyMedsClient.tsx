@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { Medication, DoseLog, Patient } from '@/lib/types'
 import { createClient } from '@/lib/supabase/client'
+import NotificationPrefs, { NotificationPrefsType } from '@/components/NotificationPrefs'
 
 interface UpcomingAppointment {
   id: string
@@ -71,6 +72,27 @@ export default function MyMedsClient({
   const [loggedMeds, setLoggedMeds] = useState<Map<string, string>>(new Map())
   const [loadingMed, setLoadingMed] = useState<string | null>(null)
   const [expanded, setExpanded] = useState<Set<TimeOfDay>>(new Set(['morning']))
+
+  // Notification prefs modal
+  const [showPrefsModal, setShowPrefsModal] = useState(false)
+  const [notifPrefs, setNotifPrefs] = useState<NotificationPrefsType | null>(null)
+  const [loadingPrefs, setLoadingPrefs] = useState(false)
+
+  async function openPrefsModal() {
+    setShowPrefsModal(true)
+    if (!notifPrefs) {
+      setLoadingPrefs(true)
+      try {
+        const res = await fetch(`/api/patients/${patient.id}/notification-prefs`)
+        if (res.ok) {
+          const data = await res.json()
+          setNotifPrefs(data)
+        }
+      } finally {
+        setLoadingPrefs(false)
+      }
+    }
+  }
 
   // Pre-populate from server logs
   const serverLogged = new Map<string, string>()
@@ -172,8 +194,51 @@ export default function MyMedsClient({
           <span className="text-2xl">💊</span>
           <span className="text-xl font-bold text-teal-700">RxNudge</span>
         </div>
-        <span className="text-lg font-medium text-gray-700">{firstName}</span>
+        <div className="flex items-center gap-3">
+          <span className="text-lg font-medium text-gray-700">{firstName}</span>
+          <button
+            onClick={openPrefsModal}
+            className="text-gray-400 hover:text-teal-600 transition-colors text-xl"
+            title="Notification Settings"
+          >
+            ⚙️
+          </button>
+        </div>
       </div>
+
+      {/* Notification Prefs Modal */}
+      {showPrefsModal && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40" onClick={() => setShowPrefsModal(false)}>
+          <div
+            className="w-full max-w-lg bg-white rounded-t-3xl shadow-xl max-h-[90vh] overflow-y-auto"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-5 pt-5 pb-2">
+              <div className="w-10 h-1 bg-gray-200 rounded-full mx-auto absolute left-1/2 -translate-x-1/2 top-3" />
+              <div />
+              <button
+                onClick={() => setShowPrefsModal(false)}
+                className="text-gray-400 hover:text-gray-600 text-2xl leading-none"
+              >
+                ×
+              </button>
+            </div>
+            <div className="px-4 pb-8">
+              {loadingPrefs ? (
+                <div className="py-12 text-center text-gray-400 text-lg">Loading…</div>
+              ) : notifPrefs ? (
+                <NotificationPrefs
+                  patientId={patient.id}
+                  initialPrefs={notifPrefs}
+                  onSave={() => setShowPrefsModal(false)}
+                />
+              ) : (
+                <div className="py-12 text-center text-gray-400 text-lg">Could not load settings.</div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="max-w-lg mx-auto px-4 py-6 pb-24">
         {/* Greeting */}

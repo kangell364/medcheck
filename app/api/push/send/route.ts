@@ -18,6 +18,7 @@ export async function POST(request: NextRequest) {
 
     const supabase = createAdminClient()
 
+    // Fetch push subscription
     const { data: row, error } = await supabase
       .from('push_subscriptions')
       .select('subscription')
@@ -28,10 +29,28 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No subscription found for patient' }, { status: 404 })
     }
 
+    // Fetch patient's notification preferences
+    const { data: patientRow } = await supabase
+      .from('patients')
+      .select('notification_sound, notification_volume, notification_style')
+      .eq('id', patient_id)
+      .single()
+
+    const notifPrefs = {
+      sound: patientRow?.notification_sound ?? 'default',
+      volume: patientRow?.notification_volume ?? 80,
+      style: patientRow?.notification_style ?? 'normal',
+    }
+
     const payload = JSON.stringify({
       title: title || 'RxNudge 💊',
       body: body || 'Time for your medications!',
+      // Merge caller-supplied data, then overlay notification prefs
       ...data,
+      sound: notifPrefs.sound,
+      volume: notifPrefs.volume,
+      style: notifPrefs.style,
+      escalationId: data?.escalationId ?? null,
     })
 
     await webpush.sendNotification(row.subscription as webpush.PushSubscription, payload)

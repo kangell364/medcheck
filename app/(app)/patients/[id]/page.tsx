@@ -6,6 +6,7 @@ import TriggerCallButton from '@/components/TriggerCallButton'
 import PatientTabs from '@/components/PatientTabs'
 import ReportModal from '@/components/ReportModal'
 import SendLoginLinkButton from '@/components/SendLoginLinkButton'
+import NotificationSettingsCard from '@/components/NotificationSettingsCard'
 
 export default async function PatientDetailPage({
   params,
@@ -211,6 +212,9 @@ export default async function PatientDetailPage({
           )}
         </div>
       </div>
+
+      {/* Notification Settings Card */}
+      <NotificationSettingsCard patientId={patient.id} />
 
       {/* Tabbed Content */}
       <PatientTabs
