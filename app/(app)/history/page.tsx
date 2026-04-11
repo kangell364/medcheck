@@ -10,6 +10,58 @@ function formatTime(time: string): string {
   return `${displayHour}:${minute} ${ampm}`
 }
 
+/**
+ * Extract the HH:MM portion from a scheduled_at ISO timestamp
+ * using the patient's timezone.
+ */
+function scheduledTimeInTz(scheduledAt: string, timezone: string): string {
+  try {
+    const date = new Date(scheduledAt)
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: timezone,
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    }).formatToParts(date)
+    const h = parts.find(p => p.type === 'hour')?.value ?? '00'
+    const m = parts.find(p => p.type === 'minute')?.value ?? '00'
+    // Normalize "24:xx" → "00:xx" (midnight edge case)
+    const normalizedH = h === '24' ? '00' : h
+    return `${normalizedH}:${m}`
+  } catch {
+    // Fallback: raw UTC time
+    const d = new Date(scheduledAt)
+    return `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`
+  }
+}
+
+/**
+ * Get YYYY-MM-DD date string for a day, in the patient's timezone.
+ */
+function dateStrInTz(date: Date, timezone: string): string {
+  try {
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: timezone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).formatToParts(date)
+    const y = parts.find(p => p.type === 'year')?.value ?? '2000'
+    const mo = parts.find(p => p.type === 'month')?.value ?? '01'
+    const d = parts.find(p => p.type === 'day')?.value ?? '01'
+    return `${y}-${mo}-${d}`
+  } catch {
+    return date.toISOString().slice(0, 10)
+  }
+}
+
+/**
+ * Get YYYY-MM-DD of a scheduled_at timestamp in the patient's timezone.
+ */
+function scheduledDateInTz(scheduledAt: string, timezone: string): string {
+  return dateStrInTz(new Date(scheduledAt), timezone)
+}
+
 export default async function HistoryPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -49,7 +101,7 @@ export default async function HistoryPage() {
     })
   )
 
-  // Build 30-day array
+  // Build 30-day array (local wall-clock days, oldest first)
   const days = Array.from({ length: 30 }, (_, i) => {
     const d = new Date()
     d.setDate(d.getDate() - (29 - i))
@@ -85,10 +137,71 @@ export default async function HistoryPage() {
       )}
 
       {patientData.map(({ patient, meds, logs }) => {
-        // Overall adherence across all meds
-        const totalPossible = days.length * meds.length
+        const timezone = patient.timezone || 'America/Chicago'
+
+        // Overall adherence across all meds × all time slots
+        const totalSlots = meds.reduce((sum, med) => sum + (med.reminder_times.length || 1) * days.length, 0)
         const totalConfirmed = logs.filter(l => l.confirmed === true).length
-        const overallPct = totalPossible > 0 ? Math.round((totalConfirmed / totalPossible) * 100) : 0
+        const overallPct = totalSlots > 0 ? Math.round((totalConfirmed / totalSlots) * 100) : 0
+
+        /**
+         * Build adherence lookup:
+         *   slotMap[medId][time][dateStr] = log | undefined
+         *
+         * time is the "HH:MM" reminder string (e.g. "08:00", "21:00")
+         * dateStr is YYYY-MM-DD in the patient timezone
+         */
+        const slotMap: Record<string, Record<string, Record<string, DoseLog>>> = {}
+
+        for (const med of meds) {
+          slotMap[med.id] = {}
+          for (const rt of med.reminder_times) {
+            slotMap[med.id][rt] = {}
+          }
+        }
+
+        for (const log of logs) {
+          const medId = log.medication_id
+          if (!slotMap[medId]) continue
+
+          const logTime = scheduledTimeInTz(log.scheduled_at, timezone)
+          const logDate = scheduledDateInTz(log.scheduled_at, timezone)
+
+          // Find the closest reminder_time (within ±5 min tolerance)
+          const med = meds.find(m => m.id === medId)
+          if (!med) continue
+
+          // Try exact match first, then closest
+          let matchedTime: string | null = null
+          if (slotMap[medId][logTime]) {
+            matchedTime = logTime
+          } else {
+            // Find nearest reminder_time
+            const [lh, lm] = logTime.split(':').map(Number)
+            const logMins = lh * 60 + lm
+            let minDiff = Infinity
+            for (const rt of med.reminder_times) {
+              const [rh, rm] = rt.split(':').map(Number)
+              const rtMins = rh * 60 + rm
+              const diff = Math.abs(logMins - rtMins)
+              if (diff < minDiff) {
+                minDiff = diff
+                matchedTime = rt
+              }
+            }
+          }
+
+          if (matchedTime && slotMap[medId][matchedTime]) {
+            // Keep the log with the most definitive status if there are duplicates
+            const existing = slotMap[medId][matchedTime][logDate]
+            if (!existing || (existing.confirmed === null && log.confirmed !== null)) {
+              slotMap[medId][matchedTime][logDate] = log
+            }
+          }
+        }
+
+        // Day date strings in patient timezone for header matching
+        const dayDateStrs = days.map(d => dateStrInTz(d, timezone))
 
         return (
           <div key={patient.id} className="bg-white rounded-2xl border border-gray-100 p-6 mb-6">
@@ -114,18 +227,19 @@ export default async function HistoryPage() {
               <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded bg-gray-100 border border-gray-200" /> No data</div>
             </div>
 
-            {/* Date header row */}
+            {/* Scrollable grid */}
             <div className="overflow-x-auto">
               <div className="min-w-max">
 
-                {/* Date labels */}
-                <div className="flex items-center mb-2">
-                  {/* Sticky spacer to match label column width */}
-                  <div className="w-48 shrink-0 sticky left-0 z-10 bg-white" />
+                {/* Date header row */}
+                <div className="flex items-end mb-2">
+                  {/* Spacer: med name column (w-44) + time label column (w-20) */}
+                  <div className="w-44 shrink-0 sticky left-0 z-20 bg-white" />
+                  <div className="w-20 shrink-0 sticky left-44 z-20 bg-white" />
                   {days.map((day, i) => (
                     <div key={i} className="w-7 shrink-0 text-center">
                       {(i % 7 === 0 || i === 29) && (
-                        <span className="text-xs text-gray-400">
+                        <span className="text-xs text-gray-400 leading-none">
                           {day.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                         </span>
                       )}
@@ -140,73 +254,98 @@ export default async function HistoryPage() {
                   </div>
                 )}
 
-                {/* One row per medication */}
+                {/* One grouped block per medication */}
                 {meds.map((med, medIdx) => {
-                  const medLogs = logs.filter(l => l.medication_id === med.id)
-                  const medConfirmed = medLogs.filter(l => l.confirmed === true).length
-                  const medMissed = medLogs.filter(l => l.confirmed === false).length
-                  const medPct = days.length > 0 ? Math.round((medConfirmed / days.length) * 100) : 0
                   const displayName = (med as any).nickname || med.name
+                  const times = med.reminder_times.length > 0 ? med.reminder_times : ['00:00']
+
+                  // Per-med adherence: count taken across all time slots
+                  const medTotalSlots = times.length * days.length
+                  const medConfirmed = times.reduce((sum, rt) => {
+                    const byDate = slotMap[med.id]?.[rt] ?? {}
+                    return sum + Object.values(byDate).filter(l => l.confirmed === true).length
+                  }, 0)
+                  const medMissed = times.reduce((sum, rt) => {
+                    const byDate = slotMap[med.id]?.[rt] ?? {}
+                    return sum + Object.values(byDate).filter(l => l.confirmed === false).length
+                  }, 0)
+                  const medPct = medTotalSlots > 0 ? Math.round((medConfirmed / medTotalSlots) * 100) : 0
+
+                  const isLastMed = medIdx === meds.length - 1
 
                   return (
                     <div
                       key={med.id}
-                      className={`flex items-center gap-1 mb-3 ${medIdx < meds.length - 1 ? 'pb-3 border-b border-gray-50' : ''}`}
+                      className={`${!isLastMed ? 'mb-4 pb-4 border-b border-gray-100' : 'mb-2'}`}
                     >
-                      {/* Medication label — sticky left column */}
-                      <div className="w-48 shrink-0 pr-3 sticky left-0 z-10 bg-white">
-                        <p className="text-sm font-semibold text-gray-800 truncate">{displayName}</p>
-                        {(med as any).nickname && (
-                          <p className="text-xs text-gray-400 truncate">{med.name}</p>
-                        )}
-                        <div className="flex items-center gap-2 mt-0.5">
-                          <span className={`text-xs font-bold ${medPct >= 80 ? 'text-teal-600' : medPct >= 50 ? 'text-amber-500' : 'text-red-500'}`}>
-                            {medPct}%
-                          </span>
-                          {medMissed > 0 && (
-                            <span className="text-xs text-red-400">{medMissed} missed</span>
-                          )}
-                        </div>
-                        <div className="flex flex-wrap gap-1 mt-1">
-                          {med.reminder_times.map(t => (
-                            <span key={t} className="text-xs text-gray-400">{formatTime(t)}</span>
-                          ))}
-                        </div>
-                      </div>
-
-                      {/* Day squares */}
-                      {days.map((day, dayIdx) => {
-                        const nextDay = new Date(day)
-                        nextDay.setDate(nextDay.getDate() + 1)
-                        const dayLog = medLogs.find(l => {
-                          const d = new Date(l.scheduled_at)
-                          return d >= day && d < nextDay
-                        })
-
-                        let bg = 'bg-gray-100 border border-gray-200'
-                        let title = `${day.toLocaleDateString()} — No data`
-
-                        if (dayLog) {
-                          if (dayLog.confirmed === true) {
-                            bg = 'bg-emerald-500'
-                            title = `${day.toLocaleDateString()} — ✅ Taken`
-                            if (dayLog.confirmed_at) {
-                              title += ` at ${new Date(dayLog.confirmed_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
-                            }
-                          } else if (dayLog.confirmed === false) {
-                            bg = 'bg-red-400'
-                            title = `${day.toLocaleDateString()} — ❌ Missed`
-                          }
-                        }
-
-                        const isToday = dayIdx === 29
+                      {times.map((rt, timeIdx) => {
+                        const isFirstTime = timeIdx === 0
+                        const byDate = slotMap[med.id]?.[rt] ?? {}
 
                         return (
-                          <div
-                            key={dayIdx}
-                            className={`w-7 h-7 shrink-0 rounded-md ${bg} ${isToday ? 'ring-2 ring-teal-500 ring-offset-1' : ''} cursor-pointer`}
-                            title={title}
-                          />
+                          <div key={rt} className="flex items-center gap-1 min-h-[2rem]">
+
+                            {/* ── Left sticky: med name + % (only on first time row) ── */}
+                            <div className="w-44 shrink-0 sticky left-0 z-10 bg-white self-stretch flex flex-col justify-center pr-2">
+                              {isFirstTime ? (
+                                <>
+                                  <p className="text-sm font-semibold text-gray-800 truncate leading-tight">{displayName}</p>
+                                  {(med as any).nickname && (
+                                    <p className="text-xs text-gray-400 truncate">{med.name}</p>
+                                  )}
+                                  <div className="flex items-center gap-2 mt-0.5">
+                                    <span className={`text-xs font-bold ${medPct >= 80 ? 'text-teal-600' : medPct >= 50 ? 'text-amber-500' : 'text-red-500'}`}>
+                                      {medPct}%
+                                    </span>
+                                    {medMissed > 0 && (
+                                      <span className="text-xs text-red-400">{medMissed} missed</span>
+                                    )}
+                                  </div>
+                                </>
+                              ) : (
+                                /* empty placeholder to keep sticky column aligned */
+                                <div />
+                              )}
+                            </div>
+
+                            {/* ── Time label (sticky after med name col) ── */}
+                            <div className="w-20 shrink-0 sticky left-44 z-10 bg-white pr-2 self-stretch flex items-center">
+                              <span className="text-xs font-medium text-gray-500 whitespace-nowrap">
+                                {formatTime(rt)}
+                              </span>
+                            </div>
+
+                            {/* ── 30 day dots for this time slot ── */}
+                            {dayDateStrs.map((dateStr, dayIdx) => {
+                              const log = byDate[dateStr]
+
+                              let bg = 'bg-gray-100 border border-gray-200'
+                              let title = `${days[dayIdx].toLocaleDateString()} ${formatTime(rt)} — No data`
+
+                              if (log) {
+                                if (log.confirmed === true) {
+                                  bg = 'bg-emerald-500'
+                                  title = `${days[dayIdx].toLocaleDateString()} ${formatTime(rt)} — ✅ Taken`
+                                  if (log.confirmed_at) {
+                                    title += ` at ${new Date(log.confirmed_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+                                  }
+                                } else if (log.confirmed === false) {
+                                  bg = 'bg-red-400'
+                                  title = `${days[dayIdx].toLocaleDateString()} ${formatTime(rt)} — ❌ Missed`
+                                }
+                              }
+
+                              const isToday = dayIdx === 29
+
+                              return (
+                                <div
+                                  key={dayIdx}
+                                  className={`w-7 h-7 shrink-0 rounded-md ${bg} ${isToday ? 'ring-2 ring-teal-500 ring-offset-1' : ''} cursor-pointer`}
+                                  title={title}
+                                />
+                              )
+                            })}
+                          </div>
                         )
                       })}
                     </div>
