@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { usePathname } from 'next/navigation'
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>
@@ -8,11 +9,15 @@ interface BeforeInstallPromptEvent extends Event {
 }
 
 export default function InstallPrompt() {
+  const pathname = usePathname()
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null)
   const [showBanner, setShowBanner] = useState(false)
   const [isIOS, setIsIOS] = useState(false)
 
   useEffect(() => {
+    // Don't show on /p/[token] pages — those have a full-screen install step
+    if (pathname?.startsWith('/p/')) return
+
     // Don't show if already running as standalone (installed)
     if (window.matchMedia('(display-mode: standalone)').matches) return
 

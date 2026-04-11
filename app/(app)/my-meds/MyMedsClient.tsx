@@ -23,6 +23,10 @@ interface Props {
   upcomingAppointments?: UpcomingAppointment[]
   patientTimezone?: string
   todayLocalStr?: string
+  /** Show "add a password" nudge — for token-page users who skipped account creation */
+  showPasswordNudge?: boolean
+  /** Patient's permanent token — used to build the account creation link */
+  token?: string
 }
 
 type TimeOfDay = 'morning' | 'afternoon' | 'evening'

@@ -42,6 +42,8 @@ export interface Patient {
   reminder_time: string // HH:MM:SS format
   sms_opted_out: boolean
   sms_opted_out_at: string | null
+  /** Patient email address */
+  email?: string | null
   /** Auth user linked to this patient record (patient-role user) */
   user_id?: string | null
   /** Stored password for magic link sign-in (generated on enrollment) */

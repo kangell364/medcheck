@@ -1,9 +1,7 @@
 import { createAdminClient } from '@/lib/supabase/admin'
 import { cookies } from 'next/headers'
 import { Medication, DoseLog, Patient } from '@/lib/types'
-import MyMedsClient from '@/app/(app)/my-meds/MyMedsClient'
-import ConsentScreen from '@/components/ConsentScreen'
-import InstallPrompt from '@/components/InstallPrompt'
+import PatientPageClient from '@/components/PatientPageClient'
 
 interface PageProps {
   params: Promise<{ token: string }>
@@ -45,8 +43,11 @@ export default async function PatientTokenPage({ params }: PageProps) {
   })
 
   const firstName = patient.name.split(' ')[0]
+  const hasConsented = !!patient.terms_accepted_at
+  const hasAccount = !!patient.user_id
+  const patientEmail: string = patient.email ?? ''
 
-  // Get caregiver name for consent screen
+  // Get caregiver name
   let caregiverName = 'Your caregiver'
   const { data: caregiverProfile } = await supabase
     .from('profiles')
@@ -57,19 +58,7 @@ export default async function PatientTokenPage({ params }: PageProps) {
     caregiverName = caregiverProfile.full_name
   }
 
-  // Show consent screen if terms not yet accepted
-  if (!patient.terms_accepted_at) {
-    return (
-      <ConsentScreen
-        patientId={patient.id}
-        token={token}
-        firstName={firstName}
-        caregiverName={caregiverName}
-      />
-    )
-  }
-
-  // Terms accepted — load meds and show the medication tracker
+  // Always load meds data (needed once consent is given)
   const { data: medications } = await supabase
     .from('medications')
     .select('*')
@@ -124,15 +113,17 @@ export default async function PatientTokenPage({ params }: PageProps) {
   }
 
   return (
-    <>
-      <MyMedsClient
-        patient={patient}
-        medications={medications || []}
-        todayLogs={todayLogs || []}
-        streak={streak}
-        firstName={firstName}
-      />
-      <InstallPrompt />
-    </>
+    <PatientPageClient
+      patient={patient}
+      token={token}
+      firstName={firstName}
+      caregiverName={caregiverName}
+      medications={medications || []}
+      todayLogs={todayLogs || []}
+      streak={streak}
+      hasConsented={hasConsented}
+      hasAccount={hasAccount}
+      patientEmail={patientEmail}
+    />
   )
 }

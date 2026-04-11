@@ -41,7 +41,11 @@ export async function proxy(request: NextRequest) {
   const isPublicPath =
     pathname.startsWith('/terms') ||
     pathname.startsWith('/privacy') ||
-    pathname.startsWith('/ref/')
+    pathname.startsWith('/ref/') ||
+    pathname.startsWith('/p/') ||
+    pathname.startsWith('/patient-login') ||
+    pathname.startsWith('/alarm') ||
+    pathname.startsWith('/onboarding')
 
   if (!user && !isAuthPath && !isApiPath && !isPublicPath) {
     const url = request.nextUrl.clone()
