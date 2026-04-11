@@ -29,6 +29,7 @@ export interface Medication {
   reminder_times: string[]
   notes: string | null
   active: boolean
+  start_date: string | null
   created_at: string
 }
 

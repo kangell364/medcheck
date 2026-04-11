@@ -149,9 +149,22 @@ export default async function HistoryPage() {
       {patientData.map(({ patient, meds, logs }) => {
         const timezone = patient.timezone || 'America/Chicago'
 
-        // Overall adherence across all meds × all time slots
-        const totalSlots = meds.reduce((sum, med) => sum + (med.reminder_times.length || 1) * days.length, 0)
-        const totalConfirmed = logs.filter(l => l.confirmed === true).length
+        // Overall adherence across all meds — only counting days from each med's start_date
+        function getDaysFromStartDate(med: Medication): number {
+          const sd = (med as any).start_date as string | null
+          if (!sd) return days.length
+          // Count days in the `days` array that are >= start_date
+          return days.filter(d => dateStrInTz(d, timezone) >= sd).length
+        }
+        const totalSlots = meds.reduce((sum, med) => sum + (med.reminder_times.length || 1) * getDaysFromStartDate(med), 0)
+        const totalConfirmed = logs.filter(l => {
+          if (l.confirmed !== true) return false
+          const med = meds.find(m => m.id === l.medication_id)
+          if (!med) return false
+          const sd = (med as any).start_date as string | null
+          if (!sd) return true
+          return scheduledDateInTz(l.scheduled_at, timezone) >= sd
+        }).length
         const overallPct = totalSlots > 0 ? Math.round((totalConfirmed / totalSlots) * 100) : 0
 
         /**
@@ -275,17 +288,32 @@ export default async function HistoryPage() {
                   const logsForThisMed = logs.filter(l => l.medication_id === med.id)
                   const snapshotName = logsForThisMed.find(l => l.medication_name)?.medication_name ?? null
 
-                  // Per-med adherence: count taken across all time slots
-                  const medTotalSlots = times.length * days.length
+                  // Per-med adherence: only count days from start_date onward
+                  const medStartDate = (med as any).start_date as string | null
+                  const medDaysCount = getDaysFromStartDate(med)
+                  const medTotalSlots = times.length * medDaysCount
                   const medConfirmed = times.reduce((sum, rt) => {
                     const byDate = slotMap[med.id]?.[rt] ?? {}
-                    return sum + Object.values(byDate).filter(l => l.confirmed === true).length
+                    return sum + Object.values(byDate).filter(l => {
+                      if (l.confirmed !== true) return false
+                      if (!medStartDate) return true
+                      return scheduledDateInTz(l.scheduled_at, timezone) >= medStartDate
+                    }).length
                   }, 0)
                   const medMissed = times.reduce((sum, rt) => {
                     const byDate = slotMap[med.id]?.[rt] ?? {}
-                    return sum + Object.values(byDate).filter(l => l.confirmed === false).length
+                    return sum + Object.values(byDate).filter(l => {
+                      if (l.confirmed !== false) return false
+                      if (!medStartDate) return true
+                      return scheduledDateInTz(l.scheduled_at, timezone) >= medStartDate
+                    }).length
                   }, 0)
                   const medPct = medTotalSlots > 0 ? Math.round((medConfirmed / medTotalSlots) * 100) : 0
+
+                  // Format start_date label
+                  const startDateLabel = medStartDate
+                    ? new Date(medStartDate + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                    : null
 
                   const isLastMed = medIdx === meds.length - 1
 
@@ -313,6 +341,9 @@ export default async function HistoryPage() {
                                   </p>
                                   {(med as any).nickname && !isInactive && (
                                     <p className="text-xs text-gray-400 truncate">{med.name}</p>
+                                  )}
+                                  {startDateLabel && !isInactive && (
+                                    <p className="text-xs text-gray-400 mt-0.5">Started {startDateLabel}</p>
                                   )}
                                   <div className="flex items-center gap-2 mt-0.5">
                                     {isInactive ? (
@@ -344,6 +375,16 @@ export default async function HistoryPage() {
 
                             {/* ── 30 day dots for this time slot ── */}
                             {dayDateStrs.map((dateStr, dayIdx) => {
+                              // Hide cells before start_date — render empty spacer
+                              if (medStartDate && dateStr < medStartDate) {
+                                return (
+                                  <div
+                                    key={dayIdx}
+                                    className="w-7 h-7 shrink-0"
+                                  />
+                                )
+                              }
+
                               const log = byDate[dateStr]
 
                               let bg = 'bg-gray-100 border border-gray-200'

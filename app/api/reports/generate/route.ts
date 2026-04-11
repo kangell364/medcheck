@@ -139,16 +139,35 @@ function buildEmailHTML(params: {
   const days = getDaysInRange(dateFrom, dateTo)
   const totalDays = days.length
 
-  // Compute global stats
+  // Helper: get effective days for a medication respecting start_date
+  function getEffectiveDays(med: Medication & { start_date?: string | null }, days: Date[]): number {
+    const sd = (med as any).start_date as string | null | undefined
+    if (!sd) return days.length
+    const startMs = new Date(sd + 'T00:00:00').getTime()
+    return days.filter(d => d.getTime() >= startMs).length
+  }
+
+  // Compute global stats — using start_date-aware denominators
   let globalScheduled = 0
   let globalTaken = 0
   let globalMissed = 0
 
   patients.forEach(({ medications }) => {
-    medications.forEach(({ logs }) => {
-      const taken = logs.filter(l => l.confirmed === true).length
-      const missed = logs.filter(l => l.confirmed === false).length
-      globalScheduled += totalDays
+    medications.forEach(({ med, logs }) => {
+      const effectiveDays = getEffectiveDays(med, days)
+      const sd = (med as any).start_date as string | null | undefined
+      const startMs = sd ? new Date(sd + 'T00:00:00').getTime() : 0
+      const taken = logs.filter(l => {
+        if (l.confirmed !== true) return false
+        if (!sd) return true
+        return new Date(l.scheduled_at).getTime() >= startMs
+      }).length
+      const missed = logs.filter(l => {
+        if (l.confirmed !== false) return false
+        if (!sd) return true
+        return new Date(l.scheduled_at).getTime() >= startMs
+      }).length
+      globalScheduled += effectiveDays
       globalTaken += taken
       globalMissed += missed
     })
@@ -173,11 +192,32 @@ function buildEmailHTML(params: {
 
     const medBlocks = medications.map(({ med, logs }) => {
       const nickname = (med as any).nickname || null
-      const medTitle = nickname ? `${med.name} <span style="color: #6b7280; font-weight: 400;">(${nickname})</span>` : med.name
-      const taken = logs.filter(l => l.confirmed === true).length
-      const missed = logs.filter(l => l.confirmed === false).length
-      const noData = totalDays - taken - missed
-      const pct = totalDays > 0 ? Math.round((taken / totalDays) * 100) : 0
+      const medStartDate = (med as any).start_date as string | null | undefined
+      const startDateDisplay = medStartDate
+        ? new Date(medStartDate + 'T12:00:00').toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
+        : null
+      const startedLine = startDateDisplay
+        ? `<span style="color: #6b7280; font-size: 12px; font-weight: 400; margin-left: 8px;">Started: ${startDateDisplay}</span>`
+        : ''
+      const medTitle = nickname
+        ? `${med.name} <span style="color: #6b7280; font-weight: 400;">(${nickname})</span>${startedLine}`
+        : `${med.name}${startedLine}`
+
+      // Use start_date-aware effective days for adherence
+      const effectiveDays = getEffectiveDays(med, days)
+      const startMs = medStartDate ? new Date(medStartDate + 'T00:00:00').getTime() : 0
+      const taken = logs.filter(l => {
+        if (l.confirmed !== true) return false
+        if (!medStartDate) return true
+        return new Date(l.scheduled_at).getTime() >= startMs
+      }).length
+      const missed = logs.filter(l => {
+        if (l.confirmed !== false) return false
+        if (!medStartDate) return true
+        return new Date(l.scheduled_at).getTime() >= startMs
+      }).length
+      const noData = effectiveDays - taken - missed
+      const pct = effectiveDays > 0 ? Math.round((taken / effectiveDays) * 100) : 0
       const pctColor = pct >= 80 ? '#0d9488' : pct >= 50 ? '#d97706' : '#dc2626'
       const streaks = computeStreaks(days, logs)
 
@@ -194,6 +234,10 @@ function buildEmailHTML(params: {
         const cells = week.map(day => {
           if (day.getTime() === 0) {
             return `<td style="width: 40px; padding: 2px;"><div style="width: 36px; height: 40px; border-radius: 6px; background: #f9fafb;"></div></td>`
+          }
+          // Hide cells before medication start_date
+          if (medStartDate && day.getTime() < startMs) {
+            return `<td style="width: 40px; padding: 2px;"><div style="width: 36px; height: 40px;"></div></td>`
           }
           const nextDay = new Date(day)
           nextDay.setDate(nextDay.getDate() + 1)

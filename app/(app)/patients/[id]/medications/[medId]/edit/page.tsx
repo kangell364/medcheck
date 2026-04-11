@@ -12,9 +12,12 @@ export default function EditMedicationPage() {
   const router = useRouter()
   const supabase = createClient()
 
+  const todayStr = new Date().toISOString().slice(0, 10)
+
   const [name, setName] = useState('')
   const [nickname, setNickname] = useState('')
   const [dosage, setDosage] = useState('')
+  const [startDate, setStartDate] = useState(todayStr)
   const [reminderTimes, setReminderTimes] = useState(['08:00'])
   const [notes, setNotes] = useState('')
   const [error, setError] = useState('')
@@ -59,6 +62,7 @@ export default function EditMedicationPage() {
       setName(med.name || '')
       setNickname((med as any).nickname || '')
       setDosage(med.dosage || '')
+      setStartDate((med as any).start_date || todayStr)
       setReminderTimes(med.reminder_times && med.reminder_times.length > 0 ? med.reminder_times : ['08:00'])
       setNotes(med.notes || '')
       setFetchLoading(false)
@@ -90,7 +94,7 @@ export default function EditMedicationPage() {
     const res = await fetch(`/api/medications/${medId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, nickname, dosage, reminder_times: reminderTimes, notes }),
+      body: JSON.stringify({ name, nickname, dosage, start_date: startDate, reminder_times: reminderTimes, notes }),
     })
 
     if (!res.ok) {
@@ -191,6 +195,23 @@ export default function EditMedicationPage() {
               className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-teal-500 text-lg"
               placeholder="e.g. 500mg, 1 tablet, 10mg"
             />
+          </div>
+
+          {/* Start Date */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Start Date <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="date"
+              value={startDate}
+              onChange={e => setStartDate(e.target.value)}
+              required
+              className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-teal-500 text-lg"
+            />
+            <p className="text-xs text-gray-400 mt-1">
+              When did this medication begin? Used to calculate adherence accurately.
+            </p>
           </div>
 
           {/* Reminder Times */}

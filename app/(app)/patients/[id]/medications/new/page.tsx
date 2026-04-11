@@ -22,9 +22,12 @@ export default function NewMedicationPage() {
   const router = useRouter()
   const supabase = createClient()
 
+  const todayStr = new Date().toISOString().slice(0, 10)
+
   const [name, setName] = useState('')
   const [nickname, setNickname] = useState('')
   const [dosage, setDosage] = useState('')
+  const [startDate, setStartDate] = useState(todayStr)
   const [frequency, setFrequency] = useState('once')
   const [reminderTimes, setReminderTimes] = useState(['08:00'])
   const [notes, setNotes] = useState('')
@@ -136,6 +139,7 @@ export default function NewMedicationPage() {
       name,
       nickname: nickname || null,
       dosage: dosage || null,
+      start_date: startDate,
       frequency,
       reminder_times: reminderTimes,
       notes: notes || null,
@@ -248,6 +252,23 @@ export default function NewMedicationPage() {
               className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-teal-500 text-lg"
               placeholder="e.g. 500mg, 1 tablet, 10mg"
             />
+          </div>
+
+          {/* Start Date */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Start Date <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="date"
+              value={startDate}
+              onChange={e => setStartDate(e.target.value)}
+              required
+              className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-teal-500 text-lg"
+            />
+            <p className="text-xs text-gray-400 mt-1">
+              When did this medication begin? Used to calculate adherence accurately.
+            </p>
           </div>
 
           {/* Frequency */}

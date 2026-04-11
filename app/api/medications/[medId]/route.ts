@@ -36,7 +36,7 @@ export async function PATCH(
   }
 
   const body = await req.json()
-  const { name, nickname, dosage, reminder_times, notes, active } = body
+  const { name, nickname, dosage, start_date, reminder_times, notes, active } = body
 
   // Archive / restore shortcut — only update active flag
   if (typeof active === 'boolean' && Object.keys(body).length === 1) {
@@ -68,6 +68,7 @@ export async function PATCH(
       name,
       nickname: nickname || null,
       dosage: dosage || null,
+      start_date: start_date || null,
       reminder_times,
       notes: notes || null,
       ...(typeof active === 'boolean' ? { active } : {}),
@@ -88,7 +89,7 @@ export async function PATCH(
     patientName: (patient as any).name,
     medicationId: medId,
     medicationName: name || medication.name,
-    internalDetails: { previousName: medication.name, updatedFields: { name, nickname, dosage, reminder_times, notes } },
+    internalDetails: { previousName: medication.name, updatedFields: { name, nickname, dosage, start_date, reminder_times, notes } },
   })
 
   return NextResponse.json({ medication: data })
