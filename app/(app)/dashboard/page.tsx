@@ -36,6 +36,19 @@ export default async function DashboardPage() {
   const tomorrow = new Date(today)
   tomorrow.setDate(tomorrow.getDate() + 1)
 
+  const nowHour = new Date().getHours()
+  const currentPeriod = nowHour < 12 ? 'morning' : nowHour < 17 ? 'afternoon' : 'evening'
+
+  function getMedPeriod(med: Medication): 'morning' | 'afternoon' | 'evening' {
+    const times = med.reminder_times || []
+    if (times.length === 0) return 'morning'
+    const [h] = times[0].split(':')
+    const hour = parseInt(h, 10)
+    if (hour < 12) return 'morning'
+    if (hour < 17) return 'afternoon'
+    return 'evening'
+  }
+
   // Get all meds and today's logs for each patient
   const patientData = await Promise.all(
     (patients || []).map(async (patient) => {
@@ -56,7 +69,41 @@ export default async function DashboardPage() {
       const confirmedDoses = (logs || []).filter(l => l.confirmed === true).length
       const missedDoses = (logs || []).filter(l => l.confirmed === false).length
 
-      return { patient, meds: meds || [], logs: logs || [], totalDoses, confirmedDoses, missedDoses }
+      // Time-of-day adherence
+      const allMeds = meds || []
+      const allLogs = logs || []
+      const confirmedIds = new Set(allLogs.filter(l => l.confirmed === true).map(l => l.medication_id))
+
+      const periods = ['morning', 'afternoon', 'evening'] as const
+      const periodStatus = periods.map(period => {
+        const periodMeds = allMeds.filter(m => getMedPeriod(m) === period)
+        if (periodMeds.length === 0) return null
+        const done = periodMeds.filter(m => confirmedIds.has(m.id)).length
+        return { period, done, total: periodMeds.length }
+      }).filter(Boolean)
+
+      // Last active (last confirmed log)
+      const lastLog = allLogs
+        .filter(l => l.confirmed === true && l.confirmed_at)
+        .sort((a, b) => new Date(b.confirmed_at!).getTime() - new Date(a.confirmed_at!).getTime())[0]
+
+      // Monthly adherence
+      const monthStart = new Date(today)
+      monthStart.setDate(1)
+      monthStart.setHours(0, 0, 0, 0)
+
+      const { data: monthLogs } = await supabase
+        .from('dose_logs')
+        .select('confirmed')
+        .eq('patient_id', patient.id)
+        .gte('scheduled_at', monthStart.toISOString())
+        .lt('scheduled_at', tomorrow.toISOString()) as { data: { confirmed: boolean | null }[] | null }
+
+      const monthTotal = (monthLogs || []).length
+      const monthConfirmed = (monthLogs || []).filter(l => l.confirmed === true).length
+      const monthPct = monthTotal > 0 ? Math.round((monthConfirmed / monthTotal) * 100) : null
+
+      return { patient, meds: allMeds, logs: allLogs, totalDoses, confirmedDoses, missedDoses, periodStatus, lastLog, monthPct }
     })
   )
 
@@ -88,13 +135,13 @@ export default async function DashboardPage() {
       {(!patients || patients.length === 0) && (
         <div className="bg-white rounded-2xl border-2 border-dashed border-gray-200 p-12 text-center">
           <div className="text-5xl mb-4">💊</div>
-          <h2 className="text-xl font-semibold text-gray-900 mb-2">No patients yet</h2>
-          <p className="text-gray-500 mb-6">Add a patient to start tracking medications.</p>
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">Add your first patient to get started</h2>
+          <p className="text-gray-500 mb-6">Track medications for a parent, spouse, or yourself.</p>
           <Link
             href="/patients/new"
             className="bg-teal-600 hover:bg-teal-700 text-white font-semibold py-3 px-8 rounded-xl inline-block transition-colors"
           >
-            Add Your First Patient
+            ➕ Add Your First Patient
           </Link>
         </div>
       )}
@@ -102,19 +149,69 @@ export default async function DashboardPage() {
       {/* Patient cards */}
       {patientData.length > 0 && (
         <div className="grid gap-6 md:grid-cols-2">
-          {patientData.map(({ patient, totalDoses, confirmedDoses, missedDoses }) => {
+          {patientData.map(({ patient, totalDoses, confirmedDoses, missedDoses, periodStatus, lastLog, monthPct }) => {
             const pct = totalDoses > 0 ? Math.round((confirmedDoses / totalDoses) * 100) : 0
             const statusColor = pct === 100 ? 'text-emerald-600' : missedDoses > 0 ? 'text-red-500' : 'text-amber-500'
             const statusBg = pct === 100 ? 'bg-emerald-50 border-emerald-200' : missedDoses > 0 ? 'bg-red-50 border-red-200' : 'bg-amber-50 border-amber-200'
+            const initial = patient.name.charAt(0).toUpperCase()
+
+            const periodIcons: Record<string, string> = { morning: '🌅', afternoon: '🌆', evening: '🌙' }
 
             return (
               <div key={patient.id} className={`bg-white rounded-2xl border-2 p-6 ${statusBg}`}>
-                <div className="flex items-start justify-between mb-4">
-                  <div>
-                    <h3 className="text-xl font-bold text-gray-900">{patient.name}</h3>
-                    <p className="text-sm text-gray-500">{patient.phone}</p>
+                {/* Header: initial + name + today % */}
+                <div className="flex items-start justify-between mb-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-teal-100 flex items-center justify-center text-teal-700 font-bold text-lg flex-shrink-0">
+                      {initial}
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-bold text-gray-900">{patient.name}</h3>
+                      <p className="text-sm text-gray-500">{patient.phone}</p>
+                    </div>
                   </div>
-                  <span className={`text-2xl font-bold ${statusColor}`}>{pct}%</span>
+                  <div className="text-right">
+                    <span className={`text-2xl font-bold ${statusColor}`}>{pct}%</span>
+                    <p className="text-xs text-gray-400">today</p>
+                  </div>
+                </div>
+
+                {/* Time-of-day status */}
+                {periodStatus && periodStatus.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 mb-3">
+                    {periodStatus.map(ps => {
+                      if (!ps) return null
+                      const isDone = ps.done === ps.total
+                      const isPast = ps.period === 'morning' && currentPeriod !== 'morning' ||
+                                     ps.period === 'afternoon' && currentPeriod === 'evening'
+                      return (
+                        <span
+                          key={ps.period}
+                          className={`text-xs px-2 py-1 rounded-full font-medium ${
+                            isDone
+                              ? 'bg-emerald-100 text-emerald-700'
+                              : isPast
+                              ? 'bg-red-100 text-red-700'
+                              : 'bg-amber-100 text-amber-700'
+                          }`}
+                        >
+                          {periodIcons[ps.period]} {isDone ? `${ps.period} done` : `${ps.done}/${ps.total} ${ps.period}`}
+                        </span>
+                      )
+                    })}
+                  </div>
+                )}
+
+                {/* Monthly adherence + last active */}
+                <div className="flex items-center justify-between text-xs text-gray-500 mb-3">
+                  {monthPct !== null && (
+                    <span>📅 {monthPct}% this month</span>
+                  )}
+                  {lastLog?.confirmed_at && (
+                    <span>
+                      Last: {new Date(lastLog.confirmed_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+                    </span>
+                  )}
                 </div>
 
                 <div className="mb-4">

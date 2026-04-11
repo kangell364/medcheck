@@ -5,6 +5,7 @@ import { Medication, DoseLog } from '@/lib/types'
 import TriggerCallButton from '@/components/TriggerCallButton'
 import PatientTabs from '@/components/PatientTabs'
 import ReportModal from '@/components/ReportModal'
+import SendLoginLinkButton from '@/components/SendLoginLinkButton'
 
 export default async function PatientDetailPage({
   params,
@@ -114,6 +115,11 @@ export default async function PatientDetailPage({
             <p className="text-gray-500">{patient.phone} • {patient.timezone}</p>
           </div>
           <div className="flex items-center gap-3">
+            <SendLoginLinkButton
+              patientId={patient.id}
+              patientPhone={patient.phone}
+              hasUserAccount={!!patient.user_id}
+            />
             <ReportModal
               patientData={[{ patient, meds: medications || [] }]}
               userEmail={user?.email || ''}

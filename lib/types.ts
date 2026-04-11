@@ -2,9 +2,26 @@ export interface Profile {
   id: string
   full_name: string | null
   phone: string | null
-  user_type: 'self' | 'caregiver'
+  user_type: 'self' | 'caregiver' | 'patient'
   plan: string
   stripe_customer_id: string | null
+  created_at: string
+}
+
+export interface PatientCaregiver {
+  id: string
+  patient_id: string
+  caregiver_id: string
+  relationship: string | null
+  created_at: string
+}
+
+export interface PatientInvite {
+  id: string
+  patient_id: string
+  token: string
+  expires_at: string
+  used_at: string | null
   created_at: string
 }
 
@@ -25,6 +42,10 @@ export interface Patient {
   reminder_time: string // HH:MM:SS format
   sms_opted_out: boolean
   sms_opted_out_at: string | null
+  /** Auth user linked to this patient record (patient-role user) */
+  user_id?: string | null
+  /** Stored password for magic link sign-in (generated on enrollment) */
+  generated_password?: string | null
   created_at: string
 }
 

@@ -107,8 +107,71 @@ export async function POST(request: NextRequest) {
           .update({ enrollment_status: 'active' })
           .eq('id', pendingPatient.id)
 
+        // Auto-create patient auth account if not yet linked
+        let appLinkMsg = ''
+        if (!pendingPatient.user_id) {
+          try {
+            const phone = fromNumber.replace(/\D/g, '')
+            const email = `patient_${phone}@rxnudge.app`
+            const password = crypto.randomUUID()
+
+            // Create Supabase auth user
+            const { data: newUser, error: createError } = await supabase.auth.admin.createUser({
+              email,
+              password,
+              email_confirm: true,
+            })
+
+            if (!createError && newUser?.user) {
+              const userId = newUser.user.id
+
+              // Create profile for patient
+              await supabase.from('profiles').upsert({
+                id: userId,
+                full_name: pendingPatient.name,
+                user_type: 'patient',
+              })
+
+              // Link patient record to user
+              await supabase
+                .from('patients')
+                .update({ user_id: userId, generated_password: password })
+                .eq('id', pendingPatient.id)
+
+              // Create patient_caregivers link
+              await supabase.from('patient_caregivers').insert({
+                patient_id: pendingPatient.id,
+                caregiver_id: pendingPatient.owner_id,
+                relationship: null,
+              })
+
+              // Create invite token (invalidate old ones first)
+              await supabase
+                .from('patient_invites')
+                .delete()
+                .eq('patient_id', pendingPatient.id)
+                .is('used_at', null)
+
+              const { data: invite } = await supabase
+                .from('patient_invites')
+                .insert({
+                  patient_id: pendingPatient.id,
+                })
+                .select('token')
+                .single()
+
+              if (invite?.token) {
+                const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://rxnudge.app'
+                appLinkMsg = ` Access your medication tracker: ${appUrl}/patient-login?token=${invite.token} 💊`
+              }
+            }
+          } catch (err) {
+            console.error('Failed to auto-create patient account:', err)
+          }
+        }
+
         twiml.message(
-          "You're all set! RxNudge will remind you about your medications daily. Reply STOP anytime to opt out. 💊"
+          `You're all set! RxNudge will remind you about your medications daily. Reply STOP anytime to opt out.${appLinkMsg}`
         )
       } else if (trimmed === 'NO') {
         await supabase
