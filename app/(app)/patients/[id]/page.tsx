@@ -2,40 +2,8 @@ import { createClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { Medication, DoseLog } from '@/lib/types'
-import ManualLogButton from '@/components/ManualLogButton'
 import TriggerCallButton from '@/components/TriggerCallButton'
-import DeleteMedButton from '@/components/DeleteMedButton'
-
-/**
- * Format a "HH:MM" reminder_time string in the patient's local timezone.
- * We construct a date for today at that wall-clock hour/minute in the
- * patient's timezone and format it back for display.
- */
-function formatTimeInTz(time: string, timezone: string): string {
-  const [hourStr, minuteStr] = time.split(':')
-  // Build a date string that represents today's date at the given wall-clock time
-  // in the patient's timezone, then format it back out in that same timezone.
-  const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: timezone }) // YYYY-MM-DD
-  const fakeDate = new Date(`${todayStr}T${hourStr.padStart(2, '0')}:${minuteStr.padStart(2, '0')}:00`)
-  return new Intl.DateTimeFormat('en-US', {
-    timeZone: timezone,
-    hour: 'numeric',
-    minute: '2-digit',
-    hour12: true,
-  }).format(fakeDate)
-}
-
-/**
- * Format an ISO timestamp in the patient's local timezone.
- */
-function formatIsoInTz(isoString: string, timezone: string): string {
-  return new Intl.DateTimeFormat('en-US', {
-    timeZone: timezone,
-    hour: 'numeric',
-    minute: '2-digit',
-    hour12: true,
-  }).format(new Date(isoString))
-}
+import PatientTabs from '@/components/PatientTabs'
 
 export default async function PatientDetailPage({
   params,
@@ -79,7 +47,6 @@ export default async function PatientDetailPage({
     .select('*')
     .eq('patient_id', id)
 
-  // Fetch pending callbacks
   const { data: pendingCallbacks } = await supabase
     .from('callbacks')
     .select('*')
@@ -87,29 +54,23 @@ export default async function PatientDetailPage({
     .eq('fulfilled', false)
     .gte('scheduled_for', new Date().toISOString())
 
-  const getMedStatus = (medId: string) => {
-    const log = (todayLogs || []).find(l => l.medication_id === medId)
-    if (!log) return 'pending'
-    // Check if snoozed and snooze still active
-    if (log.snooze_until && new Date(log.snooze_until) > new Date()) return 'snoozed'
-    if (log.confirmed === true) return 'confirmed'
-    if (log.confirmed === false) return 'missed'
-    return 'pending'
-  }
+  const { data: appointments } = await supabase
+    .from('appointments')
+    .select('*')
+    .eq('patient_id', id)
+    .eq('owner_id', user!.id)
+    .order('appointment_date', { ascending: true })
 
-  const getPendingCallback = (medId: string) => {
-    return (pendingCallbacks || []).find(cb => cb.medication_id === medId) || null
-  }
-
-  const statusConfig = {
-    confirmed: { icon: '✅', label: 'Taken', class: 'bg-emerald-50 border-emerald-200 text-emerald-700' },
-    missed: { icon: '❌', label: 'Missed', class: 'bg-red-50 border-red-200 text-red-700' },
-    pending: { icon: '⏳', label: 'Pending', class: 'bg-amber-50 border-amber-200 text-amber-700' },
-    snoozed: { icon: '😴', label: 'Snoozed', class: 'bg-amber-50 border-amber-200 text-amber-700' },
-  }
+  const { data: doctors } = await supabase
+    .from('doctors')
+    .select('*')
+    .eq('patient_id', id)
+    .eq('owner_id', user!.id)
+    .order('created_at', { ascending: true })
 
   return (
     <div className="max-w-3xl mx-auto pb-20 md:pb-0">
+      {/* Patient Header */}
       <div className="mb-6">
         <Link href="/patients" className="text-sm text-teal-600 hover:underline mb-4 inline-block">
           ← Back to Patients
@@ -138,135 +99,16 @@ export default async function PatientDetailPage({
         </div>
       </div>
 
-      {/* Today's Medications */}
-      <section className="mb-8">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-semibold text-gray-900">Today&apos;s Medications</h2>
-          <Link
-            href={`/patients/${id}/medications/new`}
-            className="text-sm bg-teal-600 hover:bg-teal-700 text-white font-medium py-2 px-4 rounded-xl transition-colors"
-          >
-            + Add Medication
-          </Link>
-        </div>
-
-        {(!medications || medications.length === 0) ? (
-          <div className="bg-white rounded-2xl border-2 border-dashed border-gray-200 p-8 text-center">
-            <div className="text-4xl mb-3">💊</div>
-            <h3 className="font-semibold text-gray-900 mb-1">No medications yet</h3>
-            <p className="text-sm text-gray-500 mb-4">Add medications to start tracking.</p>
-            <Link
-              href={`/patients/${id}/medications/new`}
-              className="bg-teal-600 hover:bg-teal-700 text-white font-medium py-2.5 px-6 rounded-xl inline-block text-sm transition-colors"
-            >
-              Add First Medication
-            </Link>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {medications.map(med => {
-              const status = getMedStatus(med.id)
-              const config = statusConfig[status]
-              const log = (todayLogs || []).find(l => l.medication_id === med.id)
-              const pendingCallback = getPendingCallback(med.id)
-              const scheduledAtStr = today.toISOString()
-
-              return (
-                <div key={med.id} className={`bg-white rounded-2xl border-2 p-5 ${config.class}`}>
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-start gap-3">
-                      <span className="text-2xl mt-0.5">{config.icon}</span>
-                      <div>
-                        <h3 className="font-bold text-gray-900 text-2xl">{med.name}</h3>
-                        {(med as any).nickname && (
-                          <p className="text-base text-teal-600 font-medium">&quot;{(med as any).nickname}&quot;</p>
-                        )}
-                        {med.dosage && /[a-zA-Z]/.test(med.dosage) && <p className="text-base text-gray-600">{med.dosage}</p>}
-                        <div className="flex flex-wrap gap-2 mt-2">
-                          {med.reminder_times.map(t => (
-                            <span key={t} className="text-sm font-semibold bg-white/80 px-3 py-1 rounded-full text-gray-700 border border-gray-200">
-                              🕐 {formatTimeInTz(t, patient.timezone)}
-                            </span>
-                          ))}
-                        </div>
-                        {/* Callback badge */}
-                        {pendingCallback && (
-                          <span className="inline-flex items-center gap-1 mt-2 text-xs font-semibold bg-orange-100 text-orange-700 px-2.5 py-1 rounded-full border border-orange-200">
-                            📞 Callback at {formatIsoInTz(pendingCallback.scheduled_for, patient.timezone)}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    <div className="flex flex-col items-end gap-2">
-                      <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${config.class}`}>
-                        {config.label}
-                      </span>
-                      {status !== 'confirmed' && (
-                        <ManualLogButton
-                          medicationId={med.id}
-                          patientId={patient.id}
-                          medicationName={med.name}
-                          scheduledAt={scheduledAtStr}
-                          snoozeUntil={log?.snooze_until ?? null}
-                        />
-                      )}
-                    </div>
-                  </div>
-                  {log?.confirmed_at && status !== 'snoozed' && (
-                    <p className="text-xs text-gray-400 mt-2 ml-9">
-                      {status === 'confirmed' ? 'Confirmed' : 'Recorded'} at {formatIsoInTz(log.confirmed_at, patient.timezone)}
-                      {log.method && ` via ${log.method}`}
-                    </p>
-                  )}
-                  {/* Edit / Delete actions */}
-                  <div className="flex items-center gap-3 mt-3 ml-9">
-                    <Link
-                      href={`/patients/${id}/medications/${med.id}/edit`}
-                      className="text-xs text-gray-400 hover:text-teal-600 transition-colors"
-                    >
-                      ✏️ Edit
-                    </Link>
-                    <DeleteMedButton medId={med.id} medName={med.name} patientId={id} />
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        )}
-      </section>
-
-      {/* Alert contacts */}
-      <section>
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-semibold text-gray-900">Alert Contacts</h2>
-          <Link
-            href={`/patients/${id}/alerts/new`}
-            className="text-sm text-teal-600 hover:underline"
-          >
-            + Add contact
-          </Link>
-        </div>
-        {(!alerts || alerts.length === 0) ? (
-          <div className="bg-white rounded-2xl border border-gray-100 p-5 text-sm text-gray-500 text-center">
-            No alert contacts yet. Add someone to be notified about missed doses.
-          </div>
-        ) : (
-          <div className="space-y-2">
-            {alerts.map((alert: any) => (
-              <div key={alert.id} className="bg-white rounded-xl border border-gray-100 p-4 flex items-center gap-3">
-                <span className="text-xl">👤</span>
-                <div>
-                  <p className="font-medium text-gray-900">{alert.name}</p>
-                  <p className="text-sm text-gray-500">
-                    {alert.phone && `📱 ${alert.phone}`}
-                    {alert.email && ` • 📧 ${alert.email}`}
-                  </p>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
+      {/* Tabbed Content */}
+      <PatientTabs
+        patient={patient}
+        medications={medications || []}
+        todayLogs={todayLogs || []}
+        alerts={alerts || []}
+        pendingCallbacks={pendingCallbacks || []}
+        appointments={appointments || []}
+        doctors={doctors || []}
+      />
     </div>
   )
 }

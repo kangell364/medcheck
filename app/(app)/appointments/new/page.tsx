@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 
@@ -12,6 +12,8 @@ interface Patient {
 
 export default function NewAppointmentPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const prefilledPatientId = searchParams.get('patientId') || ''
   const supabase = createClient()
 
   const [patients, setPatients] = useState<Patient[]>([])
@@ -19,7 +21,7 @@ export default function NewAppointmentPage() {
   const [error, setError] = useState<string | null>(null)
 
   const [form, setForm] = useState({
-    patient_id: '',
+    patient_id: prefilledPatientId,
     doctor_name: '',
     location: '',
     appointment_date: '',
@@ -40,7 +42,8 @@ export default function NewAppointmentPage() {
         .eq('active', true)
         .order('name')
       setPatients(data || [])
-      if (data && data.length > 0) {
+      // Only default to first patient if no patientId was pre-filled
+      if (data && data.length > 0 && !prefilledPatientId) {
         setForm(f => ({ ...f, patient_id: data[0].id }))
       }
     }
@@ -75,7 +78,11 @@ export default function NewAppointmentPage() {
         return
       }
 
-      router.push('/appointments')
+      if (prefilledPatientId) {
+        router.push(`/patients/${prefilledPatientId}?tab=appointments`)
+      } else {
+        router.push('/appointments')
+      }
     } catch (err) {
       setError('An unexpected error occurred')
       setLoading(false)
