@@ -119,7 +119,9 @@ export default async function HistoryPage() {
               <div className="min-w-max">
 
                 {/* Date labels */}
-                <div className="flex items-center mb-2 pl-48">
+                <div className="flex items-center mb-2">
+                  {/* Sticky spacer to match label column width */}
+                  <div className="w-48 shrink-0 sticky left-0 z-10 bg-white" />
                   {days.map((day, i) => (
                     <div key={i} className="w-7 shrink-0 text-center">
                       {(i % 7 === 0 || i === 29) && (
@@ -151,8 +153,8 @@ export default async function HistoryPage() {
                       key={med.id}
                       className={`flex items-center gap-1 mb-3 ${medIdx < meds.length - 1 ? 'pb-3 border-b border-gray-50' : ''}`}
                     >
-                      {/* Medication label */}
-                      <div className="w-48 shrink-0 pr-3">
+                      {/* Medication label — sticky left column */}
+                      <div className="w-48 shrink-0 pr-3 sticky left-0 z-10 bg-white">
                         <p className="text-sm font-semibold text-gray-800 truncate">{displayName}</p>
                         {(med as any).nickname && (
                           <p className="text-xs text-gray-400 truncate">{med.name}</p>
