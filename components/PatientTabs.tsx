@@ -138,6 +138,41 @@ export default function PatientTabs({
 
   const todayStr = new Date().toISOString()
 
+  // Pick the most relevant reminder time for snooze: the one that is currently due/overdue,
+  // or the next upcoming one, falling back to the first in the list.
+  function getRelevantReminderTime(reminderTimes: string[]): string {
+    if (!reminderTimes || reminderTimes.length === 0) return '09:00'
+    if (reminderTimes.length === 1) return reminderTimes[0]
+
+    const patientNow = new Date(
+      new Date().toLocaleString('en-US', { timeZone: patient.timezone })
+    )
+    const currentMinutes = patientNow.getHours() * 60 + patientNow.getMinutes()
+
+    // Find the latest time that is already due (current or overdue), i.e. largest <= currentMinutes
+    let bestDue: string | null = null
+    let bestDueMinutes = -1
+
+    // Find the next upcoming time (smallest > currentMinutes)
+    let bestUpcoming: string | null = null
+    let bestUpcomingMinutes = Infinity
+
+    for (const t of reminderTimes) {
+      const [h, m] = t.split(':').map(Number)
+      const mins = h * 60 + m
+      if (mins <= currentMinutes && mins > bestDueMinutes) {
+        bestDue = t
+        bestDueMinutes = mins
+      }
+      if (mins > currentMinutes && mins < bestUpcomingMinutes) {
+        bestUpcoming = t
+        bestUpcomingMinutes = mins
+      }
+    }
+
+    return bestDue ?? bestUpcoming ?? reminderTimes[0]
+  }
+
   // ─── Tab Button ─────────────────────────────────────────────────────────
 
   const TabButton = ({ id, label, emoji }: { id: TabId; label: string; emoji: string }) => {
@@ -241,6 +276,8 @@ export default function PatientTabs({
                               medicationName={med.name}
                               scheduledAt={todayStr}
                               snoozeUntil={log?.snooze_until ?? null}
+                              scheduledTime={getRelevantReminderTime(med.reminder_times)}
+                              patientTimezone={patient.timezone}
                             />
                           )}
                         </div>

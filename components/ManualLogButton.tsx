@@ -11,6 +11,10 @@ interface Props {
   medicationName: string
   scheduledAt?: string
   snoozeUntil?: string | null
+  /** HH:MM wall-clock time the med is due for the current slot (e.g. "09:00") */
+  scheduledTime: string
+  /** IANA timezone for the patient (e.g. "America/Chicago") */
+  patientTimezone: string
 }
 
 function formatSnoozeTime(isoString: string): string {
@@ -29,6 +33,8 @@ export default function ManualLogButton({
   medicationName,
   scheduledAt,
   snoozeUntil: initialSnoozeUntil,
+  scheduledTime,
+  patientTimezone,
 }: Props) {
   const [loading, setLoading] = useState(false)
   const [snoozeUntil, setSnoozeUntil] = useState<string | null>(initialSnoozeUntil ?? null)
@@ -72,7 +78,7 @@ export default function ManualLogButton({
     return (
       <div className="flex items-center">
         <span className="text-xs font-semibold bg-amber-100 text-amber-700 px-3 py-1.5 rounded-lg border border-amber-200">
-          😴 Snoozed until {formatSnoozeTime(snoozeUntil!)}
+          ⏰ Snoozed — AI will call at {formatSnoozeTime(snoozeUntil!)}
         </span>
       </div>
     )
@@ -103,6 +109,9 @@ export default function ManualLogButton({
         medicationId={medicationId}
         scheduledAt={scheduledAtStr}
         onSnooze={handleSnooze}
+        scheduledTime={scheduledTime}
+        patientTimezone={patientTimezone}
+        medicationName={medicationName}
       />
     </div>
   )

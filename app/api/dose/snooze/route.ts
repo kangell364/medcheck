@@ -1,10 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 
+// Check if a scheduled time (HH:MM) has passed in the patient's timezone
+function isScheduledTimeDue(scheduledTime: string, patientTimezone: string): boolean {
+  try {
+    const [hour, minute] = scheduledTime.split(':').map(Number)
+    const patientNow = new Date(new Date().toLocaleString('en-US', { timeZone: patientTimezone }))
+    const scheduledMinutes = hour * 60 + minute
+    const currentMinutes = patientNow.getHours() * 60 + patientNow.getMinutes()
+    return currentMinutes >= scheduledMinutes
+  } catch {
+    // If we can't parse, allow it through (fail open for server-side guard)
+    return true
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { patientId, medicationId, scheduledAt, hours } = body
+    const { patientId, medicationId, scheduledAt, hours, scheduledTime } = body
 
     if (!patientId || !medicationId || !scheduledAt || ![1, 2].includes(hours)) {
       return NextResponse.json({ error: 'Invalid request' }, { status: 400 })
@@ -12,12 +26,37 @@ export async function POST(request: NextRequest) {
 
     const supabase = createAdminClient()
 
-    // Fetch medication name for snapshot
-    const { data: medication } = await supabase
+    // Fetch medication for name + reminder_times
+    const { data: medication, error: medError } = await supabase
       .from('medications')
-      .select('name')
+      .select('name, reminder_times')
       .eq('id', medicationId)
       .single()
+
+    if (medError || !medication) {
+      return NextResponse.json({ error: 'Medication not found' }, { status: 404 })
+    }
+
+    // ── Server-side validation: is the medication actually due? ──────────────
+    // Use the scheduledTime from the request body if provided; otherwise derive
+    // from the medication's reminder_times (first one as fallback).
+    const timeToCheck: string | null = scheduledTime ?? (medication.reminder_times?.[0] ?? null)
+
+    if (timeToCheck) {
+      // Fetch patient timezone for server-side validation
+      const { data: patient } = await supabase
+        .from('patients')
+        .select('timezone')
+        .eq('id', patientId)
+        .single()
+
+      const tz = patient?.timezone || 'America/Chicago'
+
+      if (!isScheduledTimeDue(timeToCheck, tz)) {
+        return NextResponse.json({ error: 'Medication is not yet due' }, { status: 400 })
+      }
+    }
+    // ─────────────────────────────────────────────────────────────────────────
 
     const snoozeUntil = new Date(Date.now() + hours * 60 * 60 * 1000)
 
@@ -25,7 +64,7 @@ export async function POST(request: NextRequest) {
       {
         patient_id: patientId,
         medication_id: medicationId,
-        medication_name: medication?.name ?? null,
+        medication_name: medication.name ?? null,
         scheduled_at: scheduledAt,
         confirmed: null,
         method: 'snooze',
@@ -38,6 +77,20 @@ export async function POST(request: NextRequest) {
       console.error('Snooze upsert error:', error)
       return NextResponse.json({ error: 'Database error' }, { status: 500 })
     }
+
+    // ── Schedule a callback call at snooze_until ─────────────────────────────
+    const { error: callbackError } = await supabase.from('callbacks').insert({
+      patient_id: patientId,
+      medication_id: medicationId,
+      scheduled_for: snoozeUntil.toISOString(),
+      fulfilled: false,
+    })
+
+    if (callbackError) {
+      // Log but don't fail the snooze — the snooze itself succeeded
+      console.error('Callback insert error:', callbackError)
+    }
+    // ─────────────────────────────────────────────────────────────────────────
 
     return NextResponse.json({ success: true, snooze_until: snoozeUntil.toISOString() })
   } catch (err) {
