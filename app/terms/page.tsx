@@ -6,7 +6,7 @@ export const metadata = {
 }
 
 export default function TermsPage() {
-  const effectiveDate = 'April 11, 2025'
+  const effectiveDate = 'April 11, 2026'
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -73,14 +73,11 @@ export default function TermsPage() {
               medications correctly, on time, and in the proper dosage as directed by your healthcare
               provider.</strong>
             </p>
-            <p className="text-sm mb-3">
-              RxNudge assumes no liability whatsoever for:
-            </p>
+            <p className="text-sm mb-3">RxNudge assumes no liability whatsoever for:</p>
             <ul className="text-sm list-disc pl-5 space-y-1">
               <li>Any missed medication dose, regardless of cause</li>
               <li>Any medication taken in excess of the prescribed amount</li>
-              <li>Any adverse health event, injury, illness, or death resulting from a missed or
-                  incorrect medication dose</li>
+              <li>Any adverse health event, injury, illness, or death resulting from a missed or incorrect medication dose</li>
               <li>Any failure, delay, or error in delivering a reminder call, text, or notification</li>
               <li>Any technical failure, outage, or interruption of the Service</li>
               <li>Any harm resulting from reliance on the Service as a sole means of medication management</li>
@@ -141,22 +138,152 @@ export default function TermsPage() {
                   of residence, medications) is accurate and current</li>
             </ul>
             <p className="text-sm mb-3">
-              <strong>You acknowledge that by checking the consent confirmation box when adding a
-              patient, you are making a legally binding representation that the above conditions
-              are satisfied.</strong> RxNudge relies on this representation in good faith and
-              assumes no liability for calls placed based on your confirmed consent.
+              <strong>You acknowledge that by confirming enrollment, you are making a legally binding
+              representation that the above conditions are satisfied.</strong> RxNudge relies on this
+              representation in good faith and assumes no liability for calls placed based on your
+              confirmed consent.
             </p>
             <p className="text-sm">
               If you enroll a person without their consent, or provide false information about
               consent, you agree to fully indemnify, defend, and hold harmless RxNudge from any
               and all claims, fines, penalties, or damages arising from such unauthorized enrollment,
-              including any claims under the Telephone Consumer Protection Act (TCPA), state
-              wiretapping laws, or any other applicable federal or state law.
+              including any claims under the Telephone Consumer Protection Act (TCPA), the Texas
+              Business &amp; Commerce Code Chapter 302 (Texas mini-TCPA), state wiretapping laws, or
+              any other applicable federal or state law.
             </p>
           </section>
 
+          {/* ─── SMS / TCPA COMPLIANCE SECTION ─── */}
           <section>
-            <h2 className="text-xl font-bold text-gray-900 mb-3">6. Disclaimer of Warranties</h2>
+            <h2 className="text-xl font-bold text-gray-900 mb-3">6. SMS &amp; Telephone Communications — TCPA Compliance</h2>
+
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+              <p className="text-blue-900 text-sm font-semibold">
+                📱 Message &amp; Data Rates May Apply. Message frequency varies. Carriers are not responsible
+                for delayed or undelivered messages.
+              </p>
+            </div>
+
+            <h3 className="text-base font-semibold text-gray-800 mb-2">6.1 Express Written Consent</h3>
+            <p className="text-sm mb-4">
+              By enrolling in RxNudge and providing a mobile phone number, you expressly consent —
+              and, where enrolling another person, you represent that such person expressly consents —
+              to receive automated text messages (SMS/MMS) and/or pre-recorded or artificial voice
+              telephone calls from RxNudge at the mobile number provided, including numbers currently
+              on any federal or state Do-Not-Call registry. This consent is not a condition of
+              purchasing any goods or services. Standard message and data rates from your wireless
+              carrier may apply.
+            </p>
+
+            <h3 className="text-base font-semibold text-gray-800 mb-2">6.2 Types of Messages</h3>
+            <p className="text-sm mb-2">By using the Service, you may receive:</p>
+            <ul className="text-sm list-disc pl-5 space-y-1 mb-4">
+              <li>Daily medication reminder text messages (SMS/MMS)</li>
+              <li>Automated voice calls for medication reminders</li>
+              <li>Enrollment confirmation and opt-in verification messages</li>
+              <li>Opt-out and opt-in confirmation messages</li>
+              <li>Help and support messages in response to your requests</li>
+              <li>Service notifications and updates related to your account</li>
+            </ul>
+            <p className="text-sm mb-4">
+              Message frequency depends on the number of medications enrolled and your reminder
+              schedule. Typically, <strong>1–5 messages per day</strong> per enrolled patient.
+            </p>
+
+            <h3 className="text-base font-semibold text-gray-800 mb-2">6.3 How to Opt Out (STOP)</h3>
+            <p className="text-sm mb-4">
+              You may opt out of receiving SMS/MMS messages at any time by replying{' '}
+              <strong>STOP</strong> to any RxNudge text message. The following opt-out keywords are
+              also recognized: <strong>STOPALL, UNSUBSCRIBE, CANCEL, END, QUIT</strong>. Upon receipt
+              of any of these keywords, we will send one final confirmation message and you will
+              receive no further SMS/MMS messages from RxNudge unless you re-subscribe. Opting out
+              of SMS does not cancel your RxNudge account or remove you from voice call reminders
+              (if enabled). To disable all reminders, log in to your account settings.
+            </p>
+
+            <h3 className="text-base font-semibold text-gray-800 mb-2">6.4 How to Re-Subscribe (START)</h3>
+            <p className="text-sm mb-4">
+              If you have previously opted out, you may re-subscribe to SMS reminders at any time
+              by replying <strong>START</strong> to the RxNudge number or by updating your reminder
+              preferences in your account settings. Re-subscribing constitutes a new express consent
+              to receive automated messages.
+            </p>
+
+            <h3 className="text-base font-semibold text-gray-800 mb-2">6.5 Help</h3>
+            <p className="text-sm mb-4">
+              For help, reply <strong>HELP</strong> to any RxNudge text message. You will receive
+              a support message with contact information and a link to rxnudge.app. You may also
+              contact us at{' '}
+              <a href="mailto:support@rxnudge.app" className="text-teal-600 hover:underline">
+                support@rxnudge.app
+              </a>.
+            </p>
+
+            <h3 className="text-base font-semibold text-gray-800 mb-2">6.6 Carrier Disclaimer</h3>
+            <p className="text-sm mb-4">
+              <strong>Carriers (including but not limited to AT&amp;T, Verizon, T-Mobile, Sprint,
+              US Cellular, and their affiliates) are not liable for delayed or undelivered
+              messages.</strong> Message delivery is subject to effective transmission and your
+              carrier&apos;s coverage area. RxNudge does not guarantee delivery of any SMS, MMS, or
+              voice message and shall not be liable for any failed, delayed, or undelivered
+              communication.
+            </p>
+
+            <h3 className="text-base font-semibold text-gray-800 mb-2">6.7 Automated Calls — TCPA &amp; Texas Law</h3>
+            <p className="text-sm mb-4">
+              RxNudge may place automated or pre-recorded voice calls to phone numbers you provide.
+              By using the Service, you expressly consent to receive such calls. If you do not wish
+              to receive automated calls, you may disable call reminders in your account settings
+              at any time.
+            </p>
+            <p className="text-sm mb-4">
+              Users located in Texas acknowledge that RxNudge&apos;s automated communications constitute
+              informational (non-marketing) messages sent pursuant to express prior consent, and are
+              therefore exempt from certain telemarketing registration requirements under Texas
+              Business &amp; Commerce Code Chapter 302, as amended by Senate Bill 140 (effective
+              September 1, 2025). Nonetheless, RxNudge complies with all applicable consent,
+              opt-out, and quiet hours requirements under both federal TCPA and Texas law.
+            </p>
+            <p className="text-sm mb-4">
+              <strong>Quiet Hours:</strong> RxNudge will not initiate automated calls or send
+              SMS reminders between the hours of 9:00 PM and 8:00 AM in the patient&apos;s local time
+              zone, consistent with federal TCPA and Texas regulations.
+            </p>
+
+            <h3 className="text-base font-semibold text-gray-800 mb-2">6.8 Do-Not-Call Compliance</h3>
+            <p className="text-sm mb-4">
+              RxNudge&apos;s communications are initiated solely based on the express written consent
+              you provide at enrollment. By providing a phone number and consenting to reminders,
+              you acknowledge that your consent supersedes any registration on the National
+              Do-Not-Call Registry or the Texas No-Call List with respect to RxNudge&apos;s informational
+              reminder communications. You may withdraw consent at any time as described in
+              Section 6.3.
+            </p>
+
+            <h3 className="text-base font-semibold text-gray-800 mb-2">6.9 Consent Revocation — FCC Rules (Effective April 2025)</h3>
+            <p className="text-sm mb-4">
+              Pursuant to updated FCC rules effective April 11, 2025, you may revoke consent to
+              receive automated messages at any time using any reasonable means, including replying
+              STOP to any message, contacting us at support@rxnudge.app, or updating your preferences
+              in your account dashboard. RxNudge will honor all consent revocation requests within
+              a commercially reasonable time, not to exceed 10 business days.
+            </p>
+
+            <h3 className="text-base font-semibold text-gray-800 mb-2">6.10 SMS Program Details Summary</h3>
+            <div className="bg-gray-50 rounded-lg p-4 text-sm space-y-1 border border-gray-200">
+              <p><strong>Program Name:</strong> RxNudge Medication Reminders</p>
+              <p><strong>Message Types:</strong> Medication reminders, enrollment confirmations, service notifications</p>
+              <p><strong>Frequency:</strong> Varies by schedule; typically 1–5 messages/day</p>
+              <p><strong>Cost:</strong> Free from RxNudge. Message &amp; data rates from your carrier may apply.</p>
+              <p><strong>To Stop:</strong> Reply STOP to any message</p>
+              <p><strong>For Help:</strong> Reply HELP or email support@rxnudge.app</p>
+              <p><strong>Carriers:</strong> Not responsible for delayed or undelivered messages</p>
+              <p><strong>Supported Carriers:</strong> AT&amp;T, Verizon, T-Mobile, Sprint, US Cellular, and most major U.S. carriers</p>
+            </div>
+          </section>
+
+          <section>
+            <h2 className="text-xl font-bold text-gray-900 mb-3">7. Disclaimer of Warranties</h2>
             <p className="text-sm mb-3">
               <strong>THE SERVICE IS PROVIDED &quot;AS IS&quot; AND &quot;AS AVAILABLE&quot; WITHOUT WARRANTY OF ANY KIND,
               EXPRESS OR IMPLIED.</strong> To the fullest extent permitted by applicable law, RxNudge
@@ -171,7 +298,7 @@ export default function TermsPage() {
           </section>
 
           <section>
-            <h2 className="text-xl font-bold text-gray-900 mb-3">7. Limitation of Liability</h2>
+            <h2 className="text-xl font-bold text-gray-900 mb-3">8. Limitation of Liability</h2>
             <p className="text-sm mb-3">
               <strong>TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, RXNUDGE AND ITS OFFICERS,
               DIRECTORS, EMPLOYEES, AGENTS, PARTNERS, AND AFFILIATES SHALL NOT BE LIABLE FOR ANY
@@ -194,20 +321,21 @@ export default function TermsPage() {
           </section>
 
           <section>
-            <h2 className="text-xl font-bold text-gray-900 mb-3">8. Indemnification</h2>
+            <h2 className="text-xl font-bold text-gray-900 mb-3">9. Indemnification</h2>
             <p className="text-sm">
               You agree to indemnify, defend, and hold harmless RxNudge and its officers, directors,
               employees, agents, and affiliates from and against any and all claims, liabilities,
               damages, losses, costs, and expenses (including reasonable attorneys&apos; fees) arising out
               of or relating to: (a) your use of the Service; (b) your violation of these Terms;
-              (c) your violation of any applicable law or regulation; (d) any information you submit
-              to the Service; or (e) any harm to any patient or third party resulting from your use
-              of the Service.
+              (c) your violation of any applicable law or regulation, including without limitation
+              the TCPA and Texas Business &amp; Commerce Code Chapter 302; (d) any information you submit
+              to the Service; (e) any unauthorized enrollment of a third party; or (f) any harm to
+              any patient or third party resulting from your use of the Service.
             </p>
           </section>
 
           <section>
-            <h2 className="text-xl font-bold text-gray-900 mb-3">9. Call Recording &amp; Monitoring</h2>
+            <h2 className="text-xl font-bold text-gray-900 mb-3">10. Call Recording &amp; Monitoring</h2>
             <p className="text-sm mb-3">
               RxNudge reminder calls may be recorded or monitored for quality assurance, service
               improvement, and record-keeping purposes. By using the Service and providing a phone
@@ -220,8 +348,8 @@ export default function TermsPage() {
               Oregon, Pennsylvania, and Washington), RxNudge will play an automated verbal disclosure
               at the beginning of each call notifying the recipient that the call may be recorded.
               By selecting a patient&apos;s state in the Service, you represent that the patient resides
-              in that state, and you authorize RxNudge to deliver the appropriate disclosure on your
-              behalf.
+              in that state, and you authorize RxNudge to deliver the appropriate disclosure on
+              your behalf.
             </p>
             <p className="text-sm">
               <strong>You are responsible for ensuring that the state information you provide for
@@ -231,8 +359,7 @@ export default function TermsPage() {
           </section>
 
           <section>
-            <h2 className="text-xl font-bold text-gray-900 mb-3">10. HIPAA Notice</h2>
-
+            <h2 className="text-xl font-bold text-gray-900 mb-3">11. HIPAA Notice</h2>
             <p className="text-sm">
               RxNudge is not a Covered Entity or Business Associate under the Health Insurance
               Portability and Accountability Act (&quot;HIPAA&quot;). While we take reasonable steps to
@@ -243,7 +370,7 @@ export default function TermsPage() {
           </section>
 
           <section>
-            <h2 className="text-xl font-bold text-gray-900 mb-3">11. Governing Law &amp; Dispute Resolution</h2>
+            <h2 className="text-xl font-bold text-gray-900 mb-3">12. Governing Law &amp; Dispute Resolution</h2>
             <p className="text-sm mb-3">
               These Terms shall be governed by and construed in accordance with the laws of the
               State of Texas, without regard to its conflict of law provisions. Any dispute arising
@@ -259,7 +386,7 @@ export default function TermsPage() {
           </section>
 
           <section>
-            <h2 className="text-xl font-bold text-gray-900 mb-3">12. Changes to Terms</h2>
+            <h2 className="text-xl font-bold text-gray-900 mb-3">13. Changes to Terms</h2>
             <p className="text-sm">
               We reserve the right to modify these Terms at any time. We will notify registered users
               of material changes via email or in-app notice. Your continued use of the Service after
@@ -269,11 +396,16 @@ export default function TermsPage() {
           </section>
 
           <section>
-            <h2 className="text-xl font-bold text-gray-900 mb-3">13. Contact</h2>
+            <h2 className="text-xl font-bold text-gray-900 mb-3">14. Contact</h2>
             <p className="text-sm">
               For questions about these Terms, contact us at:{' '}
               <a href="mailto:legal@rxnudge.app" className="text-teal-600 hover:underline">
                 legal@rxnudge.app
+              </a>
+              <br />
+              For SMS support, reply <strong>HELP</strong> to any message or email:{' '}
+              <a href="mailto:support@rxnudge.app" className="text-teal-600 hover:underline">
+                support@rxnudge.app
               </a>
             </p>
           </section>
