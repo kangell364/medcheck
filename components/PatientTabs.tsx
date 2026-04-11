@@ -41,7 +41,7 @@ interface PatientTabsProps {
   doctors: Doctor[]
 }
 
-type TabId = 'medications' | 'doctors' | 'appointments'
+type TabId = 'medications' | 'doctors' | 'appointments' | 'contacts'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -166,6 +166,7 @@ export default function PatientTabs({
         <TabButton id="medications" label="Medications" emoji="💊" />
         <TabButton id="doctors" label="Doctors" emoji="👨‍⚕️" />
         <TabButton id="appointments" label="Appointments" emoji="📅" />
+        <TabButton id="contacts" label="Contacts" emoji="🔔" />
       </div>
 
       {/* ── Tab 1: Medications ── */}
@@ -262,39 +263,6 @@ export default function PatientTabs({
                     </div>
                   )
                 })}
-              </div>
-            )}
-          </section>
-
-          {/* Alert Contacts */}
-          <section>
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-semibold text-gray-900">Alert Contacts</h2>
-              <Link
-                href={`/patients/${patient.id}/alerts/new`}
-                className="text-sm text-teal-600 hover:underline"
-              >
-                + Add contact
-              </Link>
-            </div>
-            {alerts.length === 0 ? (
-              <div className="bg-white rounded-2xl border border-gray-100 p-5 text-sm text-gray-500 text-center">
-                No alert contacts yet. Add someone to be notified about missed doses.
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {alerts.map((alert: any) => (
-                  <div key={alert.id} className="bg-white rounded-xl border border-gray-100 p-4 flex items-center gap-3">
-                    <span className="text-xl">👤</span>
-                    <div>
-                      <p className="font-medium text-gray-900">{alert.name}</p>
-                      <p className="text-sm text-gray-500">
-                        {alert.phone && `📱 ${alert.phone}`}
-                        {alert.email && ` • 📧 ${alert.email}`}
-                      </p>
-                    </div>
-                  </div>
-                ))}
               </div>
             )}
           </section>
@@ -421,6 +389,51 @@ export default function PatientTabs({
                   </div>
                 )
               })}
+            </div>
+          )}
+        </section>
+      )}
+
+      {/* ── Tab 4: Contacts ── */}
+      {activeTab === 'contacts' && (
+        <section>
+          <div className="flex items-center justify-between mb-2">
+            <h2 className="text-xl font-semibold text-gray-900">Alert Contacts</h2>
+            <Link
+              href={`/patients/${patient.id}/alerts/new`}
+              className="text-sm bg-teal-600 hover:bg-teal-700 text-white font-medium py-2 px-4 rounded-xl transition-colors"
+            >
+              + Add Contact
+            </Link>
+          </div>
+          <p className="text-sm text-gray-500 mb-4">These people are notified when a dose is missed.</p>
+
+          {alerts.length === 0 ? (
+            <div className="bg-white rounded-2xl border-2 border-dashed border-gray-200 p-8 text-center">
+              <div className="text-4xl mb-3">🔔</div>
+              <h3 className="font-semibold text-gray-900 mb-1">No alert contacts yet</h3>
+              <p className="text-sm text-gray-500 mb-4">Add someone to be notified about missed doses.</p>
+              <Link
+                href={`/patients/${patient.id}/alerts/new`}
+                className="bg-teal-600 hover:bg-teal-700 text-white font-medium py-2.5 px-6 rounded-xl inline-block text-sm transition-colors"
+              >
+                Add First Contact
+              </Link>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {alerts.map((alert: any) => (
+                <div key={alert.id} className="bg-white rounded-xl border border-gray-100 p-4 flex items-center gap-3">
+                  <span className="text-xl">👤</span>
+                  <div>
+                    <p className="font-medium text-gray-900">{alert.name}</p>
+                    <p className="text-sm text-gray-500">
+                      {alert.phone && `📱 ${alert.phone}`}
+                      {alert.email && ` • 📧 ${alert.email}`}
+                    </p>
+                  </div>
+                </div>
+              ))}
             </div>
           )}
         </section>
