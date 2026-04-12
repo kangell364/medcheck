@@ -29,6 +29,42 @@ function frequencyLabel(freq: string): string {
   }
 }
 
+function formatTime12(time: string): string {
+  const [hourStr, minute] = time.split(':')
+  const hour = parseInt(hourStr, 10)
+  const ampm = hour >= 12 ? 'PM' : 'AM'
+  const displayHour = hour % 12 || 12
+  return `${displayHour}:${minute} ${ampm}`
+}
+
+type CellStatus = 'taken' | 'manual' | 'skipped' | 'missed' | 'none'
+
+// Skipped = confirmed:false, method:'manual'  (app skip button)
+// Manual/late = confirmed:true, method:'manual'  (caregiver manual log)
+function getSlotCell(logs: DoseLog[], medId: string, time: string, day: string): CellStatus {
+  const log = logs.find(l =>
+    l.medication_id === medId &&
+    l.scheduled_at.startsWith(day) &&
+    l.scheduled_at.includes(`T${time}`)
+  )
+  if (!log) return 'none'
+  if (log.confirmed === true && log.method === 'manual') return 'manual'
+  if (log.confirmed === true) return 'taken'
+  if (log.confirmed === false && log.method === 'manual') return 'skipped'
+  if (log.confirmed === false) return 'missed'
+  return 'none'
+}
+
+function cellLabel(status: CellStatus, confirmedAt?: string | null): string {
+  switch (status) {
+    case 'taken':   return confirmedAt ? `✅ ${new Date(confirmedAt).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',hour12:true})}` : '✅ Taken'
+    case 'manual':  return confirmedAt ? `📝 ${new Date(confirmedAt).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',hour12:true})}` : '📝 Late'
+    case 'skipped': return '⏭️ Skipped'
+    case 'missed':  return '❌ Missed'
+    default:        return '—'
+  }
+}
+
 function buildMemberReportHTML(params: {
   patient: Patient
   medications: Medication[]
@@ -37,42 +73,112 @@ function buildMemberReportHTML(params: {
   dateTo: string
 }): string {
   const { patient, medications, logs, dateFrom, dateTo } = params
-  const days = getDaysInRange(dateFrom, dateTo)
-  const totalDays = days.length
+  const allDays = getDaysInRange(dateFrom, dateTo)
+  const generatedDate = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
 
+  // Global stats (per-slot, respecting start_date)
   let globalScheduled = 0
   let globalTaken = 0
+  let globalManual = 0
+  let globalSkipped = 0
+  let globalMissed = 0
 
-  const medRows = medications.map(med => {
-    const medLogs = logs.filter(l => l.medication_id === med.id)
-    const taken = medLogs.filter(l => l.confirmed === true).length
-    const scheduled = totalDays
-    globalScheduled += scheduled
-    globalTaken += taken
-    const pct = scheduled > 0 ? Math.round((taken / scheduled) * 100) : 0
-    const color = pct >= 80 ? '#10b981' : pct >= 50 ? '#f59e0b' : '#ef4444'
+  // Build per-med sections
+  const medSections = medications.map(med => {
+    const times = med.reminder_times?.length ? med.reminder_times : ['08:00']
+    const startDate = med.start_date || null
+    // Days relevant to this med
+    const medDays = allDays.filter(d => {
+      const ds = d.toISOString().slice(0, 10)
+      return !startDate || ds >= startDate
+    })
+
+    let medTaken = 0, medManual = 0, medSkipped = 0, medMissed = 0
+    const totalSlots = times.length * medDays.length
+    globalScheduled += totalSlots
+
+    // Build per-slot tables
+    const slotTables = times.map(time => {
+      const dayRows = medDays.map(day => {
+        const ds = day.toISOString().slice(0, 10)
+        const log = logs.find(l =>
+          l.medication_id === med.id &&
+          l.scheduled_at.startsWith(ds) &&
+          l.scheduled_at.includes(`T${time}`)
+        )
+        const status = getSlotCell(logs, med.id, time, ds)
+        const label = cellLabel(status, log?.confirmed_at)
+        const dateLabel = day.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+
+        let bg = '#f9fafb'; let fg = '#6b7280'
+        if (status === 'taken')   { bg = '#d1fae5'; fg = '#065f46' }
+        if (status === 'manual')  { bg = '#ccfbf1'; fg = '#0d9488' }
+        if (status === 'skipped') { bg = '#fef3c7'; fg = '#92400e' }
+        if (status === 'missed')  { bg = '#fee2e2'; fg = '#991b1b' }
+
+        return `<tr>
+          <td style="padding:5px 10px;border-bottom:1px solid #f0f0f0;font-size:13px;color:#374151;width:90px;">${dateLabel}</td>
+          <td style="padding:5px 10px;border-bottom:1px solid #f0f0f0;">
+            <span style="background:${bg};color:${fg};font-size:12px;font-weight:600;padding:3px 10px;border-radius:99px;">${label}</span>
+          </td>
+        </tr>`
+      }).join('')
+
+      // Count for this slot
+      medDays.forEach(day => {
+        const ds = day.toISOString().slice(0, 10)
+        const s = getSlotCell(logs, med.id, time, ds)
+        if (s === 'taken')   medTaken++
+        if (s === 'manual')  medManual++
+        if (s === 'skipped') medSkipped++
+        if (s === 'missed')  medMissed++
+      })
+
+      return `
+        <div style="margin-bottom:16px;">
+          <p style="margin:0 0 6px 0;font-size:13px;font-weight:700;color:#374151;">⏰ ${formatTime12(time)} slot</p>
+          <table width="100%" style="border-collapse:collapse;background:#f9fafb;border-radius:8px;overflow:hidden;">
+            ${dayRows || '<tr><td colspan="2" style="padding:10px;color:#9ca3af;font-size:13px;">No data</td></tr>'}
+          </table>
+        </div>`
+    }).join('')
+
+    globalTaken   += medTaken
+    globalManual  += medManual
+    globalSkipped += medSkipped
+    globalMissed  += medMissed
+
+    const medTotal = medTaken + medManual
+    const medPct = totalSlots > 0 ? Math.round((medTotal / totalSlots) * 100) : 0
+    const pctColor = medPct >= 80 ? '#10b981' : medPct >= 50 ? '#f59e0b' : '#ef4444'
+    const startedLine = startDate
+      ? `<span style="font-size:12px;color:#6b7280;margin-left:8px;">Started ${new Date(startDate+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}</span>`
+      : ''
 
     return `
-      <tr>
-        <td style="padding:10px 12px;border-bottom:1px solid #f0f0f0;">
-          <div style="font-weight:600;font-size:16px;">${med.nickname || med.name}</div>
-          ${med.nickname ? `<div style="color:#888;font-size:13px;">${med.name}</div>` : ''}
-          ${med.dosage ? `<div style="color:#888;font-size:13px;">${med.dosage}</div>` : ''}
-          <div style="color:#888;font-size:13px;">${frequencyLabel(med.frequency)}</div>
-        </td>
-        <td style="padding:10px 12px;border-bottom:1px solid #f0f0f0;text-align:center;">
-          ${taken} / ${scheduled}
-        </td>
-        <td style="padding:10px 12px;border-bottom:1px solid #f0f0f0;text-align:center;">
-          <span style="color:${color};font-weight:700;font-size:18px;">${pct}%</span>
-        </td>
-      </tr>
-    `
+      <div style="margin-bottom:32px;padding-bottom:24px;border-bottom:2px solid #f0f0f0;">
+        <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:4px;">
+          <div>
+            <span style="font-size:17px;font-weight:700;color:#111;">${med.nickname || med.name}</span>
+            ${med.nickname ? `<span style="font-size:13px;color:#6b7280;margin-left:6px;">(${med.name})</span>` : ''}
+            ${startedLine}
+          </div>
+          <span style="font-size:20px;font-weight:800;color:${pctColor};">${medPct}%</span>
+        </div>
+        ${med.dosage ? `<p style="margin:0 0 8px 0;font-size:13px;color:#6b7280;">${med.dosage} · ${frequencyLabel(med.frequency)}</p>` : `<p style="margin:0 0 8px 0;font-size:13px;color:#6b7280;">${frequencyLabel(med.frequency)}</p>`}
+        <div style="display:flex;gap:16px;margin-bottom:14px;font-size:12px;">
+          <span style="color:#059669;font-weight:600;">✅ Taken: ${medTaken}</span>
+          <span style="color:#0d9488;font-weight:600;">📝 Late: ${medManual}</span>
+          <span style="color:#d97706;font-weight:600;">⏭️ Skipped: ${medSkipped}</span>
+          <span style="color:#dc2626;font-weight:600;">❌ Missed: ${medMissed}</span>
+        </div>
+        ${slotTables}
+      </div>`
   }).join('')
 
-  const overallPct = globalScheduled > 0 ? Math.round((globalTaken / globalScheduled) * 100) : 0
+  const overallTaken = globalTaken + globalManual
+  const overallPct = globalScheduled > 0 ? Math.round((overallTaken / globalScheduled) * 100) : 0
   const overallColor = overallPct >= 80 ? '#10b981' : overallPct >= 50 ? '#f59e0b' : '#ef4444'
-  const generatedDate = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
 
   return `<!DOCTYPE html>
 <html>
@@ -86,13 +192,8 @@ function buildMemberReportHTML(params: {
   .header { background: linear-gradient(135deg, #0d9488, #0891b2); color: white; padding: 32px; }
   .header h1 { margin: 0 0 4px; font-size: 26px; }
   .header p { margin: 0; opacity: 0.85; font-size: 15px; }
-  .summary { padding: 24px 32px; background: #f0fdfa; border-bottom: 1px solid #ccfbf1; display: flex; align-items: center; gap: 24px; }
-  .big-pct { font-size: 48px; font-weight: 800; color: ${overallColor}; line-height: 1; }
-  .summary-text { font-size: 15px; color: #555; }
-  .summary-text strong { font-size: 18px; color: #111; display: block; margin-bottom: 2px; }
-  table { width: 100%; border-collapse: collapse; }
-  thead th { padding: 10px 12px; text-align: left; background: #f8fafc; font-size: 13px; font-weight: 600; color: #6b7280; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 2px solid #e5e7eb; }
-  thead th:not(:first-child) { text-align: center; }
+  .content { padding: 28px 32px; }
+  .summary { padding: 20px 32px; background: #f0fdfa; border-bottom: 1px solid #ccfbf1; }
   .footer { padding: 20px 32px; color: #9ca3af; font-size: 13px; text-align: center; border-top: 1px solid #f0f0f0; }
   @media print {
     body { background: white; padding: 0; }
@@ -109,25 +210,31 @@ function buildMemberReportHTML(params: {
   </div>
 
   <div class="summary">
-    <div class="big-pct">${overallPct}%</div>
-    <div class="summary-text">
-      <strong>Overall Adherence</strong>
-      ${globalTaken} of ${globalScheduled} doses taken over ${totalDays} days
+    <div style="display:flex;align-items:center;gap:24px;">
+      <div style="font-size:48px;font-weight:800;color:${overallColor};line-height:1;">${overallPct}%</div>
+      <div>
+        <div style="font-size:16px;font-weight:700;color:#111;margin-bottom:6px;">Overall Adherence</div>
+        <div style="display:flex;gap:16px;font-size:13px;">
+          <span style="color:#059669;font-weight:600;">✅ Taken: ${globalTaken}</span>
+          <span style="color:#0d9488;font-weight:600;">📝 Late: ${globalManual}</span>
+          <span style="color:#d97706;font-weight:600;">⏭️ Skipped: ${globalSkipped}</span>
+          <span style="color:#dc2626;font-weight:600;">❌ Missed: ${globalMissed}</span>
+        </div>
+        <div style="font-size:12px;color:#6b7280;margin-top:4px;">${overallTaken} of ${globalScheduled} scheduled doses taken</div>
+      </div>
     </div>
   </div>
 
-  <table>
-    <thead>
-      <tr>
-        <th>Medication</th>
-        <th>Doses Taken</th>
-        <th>Adherence</th>
-      </tr>
-    </thead>
-    <tbody>
-      ${medRows || '<tr><td colspan="3" style="padding:20px;text-align:center;color:#9ca3af;">No medications in this period.</td></tr>'}
-    </tbody>
-  </table>
+  <div class="content">
+    ${medSections || '<p style="color:#9ca3af;text-align:center;">No medications in this period.</p>'}
+
+    <div style="margin-top:24px;padding-top:16px;border-top:1px solid #e5e7eb;">
+      <p style="font-size:12px;color:#9ca3af;margin:0;">
+        <strong>Legend:</strong>
+        ✅ Taken on time &nbsp;·&nbsp; 📝 Logged late (manual) &nbsp;·&nbsp; ⏭️ Skipped &nbsp;·&nbsp; ❌ Missed &nbsp;·&nbsp; — No data
+      </p>
+    </div>
+  </div>
 
   <div class="footer">
     Generated on ${generatedDate} · RxNudge

@@ -352,9 +352,15 @@ export default function PatientHistory({
       {!loading && medications.length > 0 && (
         <>
           {/* Legend */}
-          <div className="flex gap-4 mb-4 text-xs text-gray-500">
+          <div className="flex flex-wrap gap-4 mb-4 text-xs text-gray-500">
             <div className="flex items-center gap-1.5">
               <div className="w-3 h-3 rounded bg-emerald-500" /> Taken
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div className="w-3 h-3 rounded bg-teal-300" /> Logged late (manual)
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div className="w-3 h-3 rounded bg-amber-300" /> Skipped
             </div>
             <div className="flex items-center gap-1.5">
               <div className="w-3 h-3 rounded bg-red-400" /> Missed
@@ -484,12 +490,23 @@ export default function PatientHistory({
                             let title = `${days[dayIdx].toLocaleDateString()} ${formatTime(rt)} — No data`
 
                             if (log) {
-                              if (log.confirmed === true) {
+                              // Skipped = confirmed:false, method:'manual' (app skip button)
+                            // Manual/late = confirmed:true, method:'manual' (caregiver manual log)
+                            if (log.confirmed === true && log.method === 'manual') {
+                                bg = 'bg-teal-300'
+                                title = `${days[dayIdx].toLocaleDateString()} ${formatTime(rt)} — 📝 Logged late (${logMedName})`
+                                if (log.confirmed_at) {
+                                  title += ` at ${new Date(log.confirmed_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+                                }
+                              } else if (log.confirmed === true) {
                                 bg = 'bg-emerald-500'
                                 title = `${days[dayIdx].toLocaleDateString()} ${formatTime(rt)} — ✅ Taken (${logMedName})`
                                 if (log.confirmed_at) {
                                   title += ` at ${new Date(log.confirmed_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
                                 }
+                              } else if (log.confirmed === false && log.method === 'manual') {
+                                bg = 'bg-amber-300'
+                                title = `${days[dayIdx].toLocaleDateString()} ${formatTime(rt)} — ⏭️ Skipped (${logMedName})`
                               } else if (log.confirmed === false) {
                                 bg = 'bg-red-400'
                                 title = `${days[dayIdx].toLocaleDateString()} ${formatTime(rt)} — ❌ Missed (${logMedName})`

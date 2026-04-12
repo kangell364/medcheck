@@ -763,7 +763,6 @@ export default function MyMedsClient({
 
   // ── History helpers ────────────────────────────────────────────────────────
   // We need all logs for history — todayLogs only covers today.
-  // For now use todayLogs for today and a separate fetch for history.
   const [allLogs, setAllLogs] = useState<DoseLog[] | null>(null)
 
   useEffect(() => {
@@ -782,9 +781,9 @@ export default function MyMedsClient({
       })
   }, [dashTab, patient.id, supabase, allLogs])
 
-  const last30 = Array.from({ length: 30 }, (_, i) => {
+  const last14 = Array.from({ length: 14 }, (_, i) => {
     const d = new Date()
-    d.setDate(d.getDate() - (29 - i))
+    d.setDate(d.getDate() - (13 - i))
     return d.toISOString().slice(0, 10)
   })
 
@@ -801,22 +800,39 @@ export default function MyMedsClient({
     })
   }
 
-  // Adherence calculation based on history slots × 30 days
-  const totalCells = historySlots.length * 30
+  // Cell value lookup — full per-slot status
+  // Skipped = confirmed:false, method:'manual'  (app skip button stores this)
+  // Manual/late = confirmed:true, method:'manual'  (caregiver manual log)
+  function getHistoryCell(medId: string, time: string, day: string): '✅' | '⏭️' | '📝' | '❌' | '⬜' {
+    if (!allLogs) return '⬜'
+    const log = allLogs.find(l =>
+      l.medication_id === medId &&
+      l.scheduled_at.startsWith(day) &&
+      l.scheduled_at.includes(`T${time}`)
+    )
+    if (!log) return '⬜'
+    if (log.confirmed === true && log.method === 'manual') return '📝'
+    if (log.confirmed === true) return '✅'
+    if (log.confirmed === false && log.method === 'manual') return '⏭️'
+    if (log.confirmed === false) return '❌'
+    return '⬜'
+  }
+
+  // Adherence: count ✅ and 📝 as taken, skip days before med.start_date
   let takenCells = 0
+  let scheduledCells = 0
   if (allLogs) {
     for (const slot of historySlots) {
-      for (const day of last30) {
-        const log = allLogs.find(l =>
-          l.medication_id === slot.med.id &&
-          l.scheduled_at.startsWith(day) &&
-          l.scheduled_at.includes(`T${slot.time}`)
-        )
-        if (log?.confirmed === true) takenCells++
+      const startDate = slot.med.start_date || null
+      for (const day of last14) {
+        if (startDate && day < startDate) continue
+        scheduledCells++
+        const cell = getHistoryCell(slot.med.id, slot.time, day)
+        if (cell === '✅' || cell === '📝') takenCells++
       }
     }
   }
-  const adherencePct = totalCells > 0 ? Math.round((takenCells / totalCells) * 100) : 0
+  const adherencePct = scheduledCells > 0 ? Math.round((takenCells / scheduledCells) * 100) : 0
 
   // ── Report download ───────────────────────────────────────────────────────
   const [downloadingReport, setDownloadingReport] = useState(false)
@@ -966,38 +982,47 @@ export default function MyMedsClient({
                 <thead>
                   <tr>
                     <th className="text-left text-sm text-gray-500 font-medium pr-2 pb-2 min-w-[90px]">Med / Time</th>
-                    {last30.slice(-14).map(d => (
+                    {last14.map(d => (
                       <th key={d} className="text-center text-gray-400 pb-2 w-7">{new Date(d + 'T12:00:00').getDate()}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
-                  {historySlots.map((slot, idx) => (
-                    <tr key={`${slot.med.id}:${slot.time}:${idx}`}>
-                      <td className="text-sm text-gray-700 pr-2 py-1 truncate max-w-[90px]">
-                        {slot.label}
-                        {slot.med.reminder_times?.length > 1 && idx === historySlots.findIndex(s => s.med.id === slot.med.id) && (
-                          <span className="ml-1 text-xs text-gray-400">{formatReminderTime(slot.time)}</span>
-                        )}
-                      </td>
-                      {last30.slice(-14).map(d => {
-                        const log = allLogs.find(l =>
-                          l.medication_id === slot.med.id &&
-                          l.scheduled_at.startsWith(d) &&
-                          l.scheduled_at.includes(`T${slot.time}`)
-                        )
-                        const cell = log?.confirmed ? '✅' : (log?.confirmed === false && log?.method === 'manual') ? '⏭️' : '⬜'
-                        return (
-                          <td key={d} className="text-center py-1">
-                            <span className="text-base">{cell}</span>
-                          </td>
-                        )
-                      })}
-                    </tr>
-                  ))}
+                  {historySlots.map((slot, idx) => {
+                    const startDate = slot.med.start_date || null
+                    return (
+                      <tr key={`${slot.med.id}:${slot.time}:${idx}`}>
+                        <td className="text-sm text-gray-700 pr-2 py-1 truncate max-w-[90px]">
+                          {slot.label}
+                          {slot.med.reminder_times?.length > 1 && idx === historySlots.findIndex(s => s.med.id === slot.med.id) && (
+                            <span className="ml-1 text-xs text-gray-400">{formatReminderTime(slot.time)}</span>
+                          )}
+                        </td>
+                        {last14.map(d => {
+                          // Skip days before medication start_date — render blank spacer, no cell
+                          if (startDate && d < startDate) {
+                            return <td key={d} className="w-7 py-1" />
+                          }
+                          const cell = getHistoryCell(slot.med.id, slot.time, d)
+                          return (
+                            <td key={d} className="text-center py-1">
+                              <span className="text-base">{cell}</span>
+                            </td>
+                          )
+                        })}
+                      </tr>
+                    )
+                  })}
                 </tbody>
               </table>
-              <p className="text-xs text-gray-400 mt-3 text-center">Showing last 14 days</p>
+              {/* Legend */}
+              <div className="flex flex-wrap gap-3 mt-4 text-sm text-gray-500">
+                <span>✅ Taken</span>
+                <span>📝 Logged late</span>
+                <span>⏭️ Skipped</span>
+                <span>❌ Missed</span>
+                <span>⬜ No data</span>
+              </div>
             </div>
           )}
         </div>
