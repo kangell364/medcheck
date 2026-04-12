@@ -181,26 +181,10 @@ export default async function PatientDetailPage({
             </span>
           </div>
 
-          {/* Reminder time */}
-          <div className="flex items-center gap-1.5 text-gray-600">
+          {/* Reminder times set per medication */}
+          <div className="flex items-center gap-1.5 text-gray-500 text-xs">
             <span>🕗</span>
-            <span>
-              Time:{' '}
-              <span className="font-medium text-gray-800">
-                {patient.reminder_time
-                  ? new Intl.DateTimeFormat('en-US', {
-                      hour: 'numeric',
-                      minute: '2-digit',
-                      hour12: true,
-                      timeZone: patient.timezone ?? 'America/Chicago',
-                    }).format(
-                      new Date(
-                        `1970-01-01T${patient.reminder_time.length === 5 ? patient.reminder_time + ':00' : patient.reminder_time}`
-                      )
-                    )
-                  : '8:00 AM'}
-              </span>
-            </span>
+            <span>Reminder times set per medication</span>
           </div>
 
           {/* SMS opt-out warning */}

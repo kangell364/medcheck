@@ -85,8 +85,6 @@ export default function EditPatientPage() {
         state,
         reminders_enabled: remindersEnabled,
         contact_method: contactMethod,
-        // Send as HH:MM:SS for Postgres TIME column
-        reminder_time: `${reminderTime}:00`,
       }),
     })
 
@@ -225,21 +223,10 @@ export default function EditPatientPage() {
                 </div>
               </div>
 
-              {/* Reminder time */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Daily reminder time
-                </label>
-                <input
-                  type="time"
-                  value={reminderTime}
-                  onChange={e => setReminderTime(e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-teal-500 text-lg"
-                />
-                <p className="text-xs text-gray-400 mt-1">
-                  Reminders are sent in the member&apos;s timezone ({getTimezoneForState(state)})
-                </p>
-              </div>
+              {/* Reminder time removed — each medication has its own reminder times */}
+              <p className="text-xs text-gray-400">
+                Reminder times are set per medication. Timezone: {getTimezoneForState(state)}
+              </p>
             </div>
           </div>
 
