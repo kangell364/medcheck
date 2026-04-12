@@ -21,6 +21,7 @@ export default function NewPatientPage() {
   const [email, setEmail] = useState('')
   const [state, setState] = useState('TX')
   const [patientConsent, setPatientConsent] = useState(false)
+  const [memberCanSelfManage, setMemberCanSelfManage] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [enrollmentModal, setEnrollmentModal] = useState<EnrollmentModal | null>(null)
@@ -82,6 +83,7 @@ export default function NewPatientPage() {
         timezone: getTimezoneForState(state),
         is_self: isSelf,
         enrollment_status: enrollmentStatus,
+        member_can_self_manage: memberCanSelfManage,
       })
       .select()
       .single()
@@ -336,6 +338,49 @@ export default function NewPatientPage() {
                 </p>
               )}
             </div>
+
+            {/* Medication management preference — non-self only */}
+            {!isSelf && (
+              <div className="space-y-3">
+                <label className="block text-sm font-medium text-gray-700">Medication Management</label>
+
+                <button
+                  type="button"
+                  onClick={() => setMemberCanSelfManage(true)}
+                  className={`w-full text-left p-4 rounded-xl border-2 transition-all flex items-start gap-3 ${
+                    memberCanSelfManage ? 'border-teal-500 bg-teal-50' : 'border-gray-200 bg-white hover:border-gray-300'
+                  }`}
+                >
+                  <div className={`mt-0.5 w-5 h-5 rounded border-2 flex items-center justify-center shrink-0 ${
+                    memberCanSelfManage ? 'border-teal-500 bg-teal-500' : 'border-gray-300'
+                  }`}>
+                    {memberCanSelfManage && <span className="text-white text-xs">✓</span>}
+                  </div>
+                  <div>
+                    <p className="font-semibold text-gray-900">Allow member to manage their own medications</p>
+                    <p className="text-sm text-gray-500 mt-0.5">They can add, edit, and remove their own meds directly</p>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setMemberCanSelfManage(false)}
+                  className={`w-full text-left p-4 rounded-xl border-2 transition-all flex items-start gap-3 ${
+                    !memberCanSelfManage ? 'border-teal-500 bg-teal-50' : 'border-gray-200 bg-white hover:border-gray-300'
+                  }`}
+                >
+                  <div className={`mt-0.5 w-5 h-5 rounded border-2 flex items-center justify-center shrink-0 ${
+                    !memberCanSelfManage ? 'border-teal-500 bg-teal-500' : 'border-gray-300'
+                  }`}>
+                    {!memberCanSelfManage && <span className="text-white text-xs">✓</span>}
+                  </div>
+                  <div>
+                    <p className="font-semibold text-gray-900">I will oversee their medications</p>
+                    <p className="text-sm text-gray-500 mt-0.5">I control all meds — they can only request changes for my approval</p>
+                  </div>
+                </button>
+              </div>
+            )}
 
             {/* Consent — required for non-self */}
             {!isSelf && (

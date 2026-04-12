@@ -958,34 +958,36 @@ export default function MyMedsClient({
                           </button>
                         )}
 
-                        {/* Change request button area */}
-                        <div className="mt-3">
-                          {reqState?.status === 'pending' ? (
-                            <div className="w-full bg-amber-50 border border-amber-200 text-amber-700 font-medium py-3 px-4 rounded-full text-base text-center">
-                              ⏳ Change Pending Approval
-                            </div>
-                          ) : reqState?.status === 'declined' ? (
-                            <div className="space-y-1">
+                        {/* Change request button area — only show if caregiver oversees meds */}
+                        {!patient.member_can_self_manage && (
+                          <div className="mt-3">
+                            {reqState?.status === 'pending' ? (
+                              <div className="w-full bg-amber-50 border border-amber-200 text-amber-700 font-medium py-3 px-4 rounded-full text-base text-center">
+                                ⏳ Change Pending Approval
+                              </div>
+                            ) : reqState?.status === 'declined' ? (
+                              <div className="space-y-1">
+                                <button
+                                  onClick={() => setChangeReqModal(med)}
+                                  className="w-full border border-teal-300 text-teal-700 font-medium py-3 px-4 rounded-full text-base hover:bg-teal-50 transition-colors"
+                                >
+                                  💬 Request a Change
+                                </button>
+                                <p className="text-sm text-gray-500 text-center">
+                                  Last request was declined.{' '}
+                                  {reqState.caregiverNote ? `"${reqState.caregiverNote}"` : 'You can submit a new request.'}
+                                </p>
+                              </div>
+                            ) : (
                               <button
                                 onClick={() => setChangeReqModal(med)}
                                 className="w-full border border-teal-300 text-teal-700 font-medium py-3 px-4 rounded-full text-base hover:bg-teal-50 transition-colors"
                               >
                                 💬 Request a Change
                               </button>
-                              <p className="text-sm text-gray-500 text-center">
-                                Last request was declined.{' '}
-                                {reqState.caregiverNote ? `"${reqState.caregiverNote}"` : 'You can submit a new request.'}
-                              </p>
-                            </div>
-                          ) : (
-                            <button
-                              onClick={() => setChangeReqModal(med)}
-                              className="w-full border border-teal-300 text-teal-700 font-medium py-3 px-4 rounded-full text-base hover:bg-teal-50 transition-colors"
-                            >
-                              💬 Request a Change
-                            </button>
-                          )}
-                        </div>
+                            )}
+                          </div>
+                        )}
                       </div>
                     )
                   })}
@@ -995,16 +997,18 @@ export default function MyMedsClient({
           )
         })}
 
-        {/* Request New Medication button */}
-        <div className="mt-6">
-          <button
-            onClick={() => setShowNewMedModal(true)}
-            className="w-full border-2 border-teal-400 text-teal-700 font-semibold py-4 px-6 rounded-2xl text-xl hover:bg-teal-50 transition-colors flex items-center justify-center gap-2"
-          >
-            <span className="text-2xl">+</span>
-            Request a New Medication
-          </button>
-        </div>
+        {/* Request New Medication button — only show if caregiver oversees meds */}
+        {!patient.member_can_self_manage && (
+          <div className="mt-6">
+            <button
+              onClick={() => setShowNewMedModal(true)}
+              className="w-full border-2 border-teal-400 text-teal-700 font-semibold py-4 px-6 rounded-2xl text-xl hover:bg-teal-50 transition-colors flex items-center justify-center gap-2"
+            >
+              <span className="text-2xl">+</span>
+              Request a New Medication
+            </button>
+          </div>
+        )}
 
         {/* Streak */}
         {(streak > 0 || takenToday === allMedsToday) && (

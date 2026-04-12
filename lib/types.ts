@@ -58,6 +58,8 @@ export interface Patient {
   /** Notification preferences */
   notification_style?: 'silent' | 'normal' | 'alarm'
   notification_volume?: number
+  /** If true, member can add/edit/remove their own meds directly. If false, member can only request changes. */
+  member_can_self_manage?: boolean
   notification_sound?: string
   created_at: string
 }
