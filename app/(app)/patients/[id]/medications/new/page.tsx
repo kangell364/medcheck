@@ -20,13 +20,15 @@ export default function NewMedicationPage() {
   const params = useParams()
   const patientId = params.id as string
   const router = useRouter()
+  const searchParams = useSearchParams()
   const supabase = createClient()
 
   const todayStr = new Date().toISOString().slice(0, 10)
 
-  const [name, setName] = useState('')
-  const [nickname, setNickname] = useState('')
-  const [dosage, setDosage] = useState('')
+  // Pre-fill from query params (used when caregiver approves a new med request)
+  const [name, setName] = useState(searchParams.get('name') || '')
+  const [nickname, setNickname] = useState(searchParams.get('nickname') || '')
+  const [dosage, setDosage] = useState(searchParams.get('dosage') || '')
   const [startDate, setStartDate] = useState(todayStr)
   const [frequency, setFrequency] = useState('once')
   const [reminderTimes, setReminderTimes] = useState(['08:00'])
