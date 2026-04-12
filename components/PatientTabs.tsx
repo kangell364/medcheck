@@ -1,7 +1,8 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
+import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 import { Medication, DoseLog, PatientAlert, Patient } from '@/lib/types'
 import ManualLogButton from '@/components/ManualLogButton'
@@ -117,12 +118,26 @@ export default function PatientTabs({
 }: PatientTabsProps) {
   const searchParams = useSearchParams()
   const router = useRouter()
+  const supabase = createClient()
 
   const initialTab = (searchParams.get('tab') as TabId) || 'medications'
   const [activeTab, setActiveTab] = useState<TabId>(initialTab)
   const [archiveOpen, setArchiveOpen] = useState(false)
+  const [selfManage, setSelfManage] = useState<boolean>(!!patient.member_can_self_manage)
+  const [togglingControl, setTogglingControl] = useState(false)
   // snoozeMap tracks optimistic snooze_until per medication ID after user clicks Snooze
   const [snoozeMap, setSnoozeMap] = useState<Record<string, string>>({})
+
+  const toggleMemberControl = useCallback(async () => {
+    setTogglingControl(true)
+    const newVal = !selfManage
+    const { error } = await supabase
+      .from('patients')
+      .update({ member_can_self_manage: newVal })
+      .eq('id', patient.id)
+    if (!error) setSelfManage(newVal)
+    setTogglingControl(false)
+  }, [selfManage, patient.id, supabase])
 
   function handleMedSnooze(medId: string, snoozeUntil: string) {
     setSnoozeMap(prev => ({ ...prev, [medId]: snoozeUntil }))
@@ -236,12 +251,26 @@ export default function PatientTabs({
           <section className="mb-8">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-semibold text-gray-900">Today&apos;s Medications</h2>
-              <Link
-                href={`/patients/${patient.id}/medications/new`}
-                className="text-sm bg-teal-600 hover:bg-teal-700 text-white font-medium py-2 px-4 rounded-xl transition-colors"
-              >
-                + Add Medication
-              </Link>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={toggleMemberControl}
+                  disabled={togglingControl}
+                  title={selfManage ? 'Member currently controls their own meds' : 'Member can only request changes'}
+                  className={`text-xs font-medium py-2 px-3 rounded-xl border transition-colors disabled:opacity-50 ${
+                    selfManage
+                      ? 'bg-amber-50 border-amber-300 text-amber-700 hover:bg-amber-100'
+                      : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'
+                  }`}
+                >
+                  {togglingControl ? '…' : selfManage ? '🔒 Take Back Control' : '🔓 Grant Member Control'}
+                </button>
+                <Link
+                  href={`/patients/${patient.id}/medications/new`}
+                  className="text-sm bg-teal-600 hover:bg-teal-700 text-white font-medium py-2 px-4 rounded-xl transition-colors"
+                >
+                  + Add Medication
+                </Link>
+              </div>
             </div>
 
             {medications.length === 0 ? (
