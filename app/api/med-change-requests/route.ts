@@ -4,10 +4,6 @@ import { createAdminClient } from '@/lib/supabase/admin'
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
     const body = await request.json()
     const {
       patient_id,
@@ -19,6 +15,7 @@ export async function POST(request: NextRequest) {
       requested_reminder_times,
       requested_nickname,
       requested_notes,
+      requested_start_date,
       member_note,
     } = body
 
@@ -31,7 +28,7 @@ export async function POST(request: NextRequest) {
 
     const admin = createAdminClient()
 
-    // Verify patient exists and belongs to a caregiver we can notify
+    // Verify patient exists — allow unauthenticated (member on /p/[token] has no session)
     const { data: patient } = await admin
       .from('patients')
       .select('id, name, owner_id')
@@ -39,6 +36,11 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (!patient) return NextResponse.json({ error: 'Patient not found' }, { status: 404 })
+
+    // Get requesting user if logged in (optional)
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    const requestedBy = user?.id || null
 
     // Fetch medication name for alert message
     let medName = requested_name || 'Unknown medication'
@@ -57,7 +59,7 @@ export async function POST(request: NextRequest) {
       .insert({
         patient_id,
         medication_id: medication_id || null,
-        requested_by: user.id,
+        requested_by: requestedBy,
         type,
         status: 'pending',
         requested_name: requested_name || null,
@@ -66,6 +68,7 @@ export async function POST(request: NextRequest) {
         requested_reminder_times: requested_reminder_times || null,
         requested_nickname: requested_nickname || null,
         requested_notes: requested_notes || null,
+        requested_start_date: requested_start_date || null,
         member_note: member_note || null,
       })
       .select()
