@@ -376,29 +376,16 @@ export default function PatientTabs({
                           </div>
                         </div>
                         <div className="flex flex-col items-end gap-2">
-                          {overallStatus === 'snoozed' ? (
-                            <div className="flex flex-col items-end gap-0.5">
-                              <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-50 border border-amber-200 text-amber-700">
-                                ⏰ Snoozed
-                              </span>
-                              {getMedSnoozeUntil(med.id) && (
-                                <span className="text-xs text-amber-600">
-                                  Reminds at {formatIsoInTz(getMedSnoozeUntil(med.id)!, patient.timezone)}
-                                </span>
-                              )}
-                            </div>
-                          ) : (
                             <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${overallConfig.class}`}>
                               {overallConfig.label}
                             </span>
-                          )}
                         </div>
                       </div>
 
                       {/* Per-time-slot rows */}
                       <div className="space-y-2 mb-3">
                         {times.map(rt => {
-                          const slotStatus = overallStatus === 'snoozed' ? 'snoozed' : getSlotStatus(med.id, rt)
+                          const slotStatus = getSlotStatus(med.id, rt)
                           const slotLog = getSlotLog(med.id, rt)
 
                           const slotStatusConfig = {
@@ -427,16 +414,13 @@ export default function PatientTabs({
                                 <span className={`text-xs font-semibold px-2 py-0.5 rounded-full border ${slotStatusConfig.class}`}>
                                   {slotStatusConfig.label}
                                 </span>
-                                {slotStatus !== 'confirmed' && slotStatus !== 'snoozed' && (
+                                {slotStatus === 'missed' && (
                                   <ManualLogButton
                                     medicationId={med.id}
                                     patientId={patient.id}
                                     medicationName={med.name}
-                                    scheduledAt={todayStr}
-                                    snoozeUntil={getMedSnoozeUntil(med.id)}
                                     scheduledTime={rt}
                                     patientTimezone={patient.timezone}
-                                    onSnooze={(su) => handleMedSnooze(med.id, su)}
                                   />
                                 )}
                               </div>
