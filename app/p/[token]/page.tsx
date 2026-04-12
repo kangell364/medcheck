@@ -1,5 +1,4 @@
 import { createAdminClient } from '@/lib/supabase/admin'
-import { cookies } from 'next/headers'
 import { Medication, DoseLog, Patient } from '@/lib/types'
 import PatientOnboarding from './PatientOnboarding'
 
@@ -32,15 +31,7 @@ export default async function PatientTokenPage({ params }: PageProps) {
     )
   }
 
-  // Store patient_id in a readable cookie (for dose logging from this page)
-  const cookieStore = await cookies()
-  cookieStore.set('rxnudge_patient_id', patient.id, {
-    path: '/',
-    maxAge: 60 * 60 * 24 * 365, // 1 year
-    httpOnly: false, // JS-readable so client components can log doses
-    sameSite: 'lax',
-    secure: process.env.NODE_ENV === 'production',
-  })
+  // Note: cookie setting moved to client side via PatientOnboarding component
 
   const firstName = patient.name.split(' ')[0]
   const patientEmail: string = (patient as Patient & { email?: string | null }).email ?? ''
