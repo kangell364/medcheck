@@ -682,8 +682,10 @@ export default function MyMedsClient({
     // Fall back to server data
     const serverLog = slotLogMap.get(key)
     if (serverLog) {
-      if (serverLog.method === 'skipped' || serverLog.confirmed === false) {
-        return { isTaken: false, isSkipped: serverLog.method === 'skipped', takenAt: null }
+      if (serverLog.confirmed === false) {
+        // method='manual' + confirmed=false = skipped
+        const isSkipped = serverLog.method === 'manual'
+        return { isTaken: false, isSkipped, takenAt: null }
       }
       if (serverLog.confirmed === true) {
         return { isTaken: true, isSkipped: false, takenAt: serverLog.confirmed_at }
@@ -984,7 +986,7 @@ export default function MyMedsClient({
                           l.scheduled_at.startsWith(d) &&
                           l.scheduled_at.includes(`T${slot.time}`)
                         )
-                        const cell = log?.confirmed ? '✅' : log?.method === 'skipped' ? '⏭️' : '⬜'
+                        const cell = log?.confirmed ? '✅' : (log?.confirmed === false && log?.method === 'manual') ? '⏭️' : '⬜'
                         return (
                           <td key={d} className="text-center py-1">
                             <span className="text-base">{cell}</span>
