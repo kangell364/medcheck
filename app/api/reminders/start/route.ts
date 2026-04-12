@@ -60,35 +60,64 @@ async function startEscalationForPatient(
   if (patient.sms_opted_out) return { skipped: true, reason: 'sms_opted_out' }
 
   const timezone = getTimezoneForState(patient.state ?? '') || patient.timezone || 'America/Chicago'
-  const reminderTime: string = patient.reminder_time ?? '08:00:00'
 
-  if (!isInReminderWindow(reminderTime, timezone)) return { skipped: true, reason: 'outside_reminder_window' }
   if (isQuietHours(timezone)) return { skipped: true, reason: 'quiet_hours' }
 
   const today = getTodayInTimezone(timezone)
 
-  // No double-starts
+  // Active medications
+  const { data: medications } = await supabase
+    .from('medications')
+    .select('id, name, nickname, dosage, reminder_times, start_date')
+    .eq('patient_id', patient.id)
+    .eq('active', true)
+    .is('archived_at', null)
+
+  if (!medications || medications.length === 0) return { skipped: true, reason: 'no_active_medications' }
+
+  // Find meds that have a reminder_time slot within the current window
+  // Each med can have multiple reminder_times e.g. ['08:00', '21:00']
+  const medsToRemind = medications.filter((med: any) => {
+    const times: string[] = med.reminder_times || []
+    // Skip if med hasn't started yet
+    if (med.start_date && med.start_date > today) return false
+    return times.some((t: string) => isInReminderWindow(t, timezone))
+  }) as MedForSms[]
+
+  if (medsToRemind.length === 0) return { skipped: true, reason: 'outside_reminder_window' }
+
+  // Get the matching time slot for the escalation key (use first matching slot)
+  const matchingTime = (() => {
+    for (const med of medsToRemind) {
+      const times: string[] = (med as any).reminder_times || []
+      const t = times.find((t: string) => isInReminderWindow(t, timezone))
+      if (t) return t
+    }
+    return 'unknown'
+  })()
+
+  // No double-starts for same patient+date+time slot
   const { data: existing } = await supabase
     .from('reminder_escalations')
     .select('id, status')
     .eq('patient_id', patient.id)
     .eq('escalation_date', today)
-    .single()
+    .ilike('status', '%')
+    .limit(1)
+    .maybeSingle()
 
-  if (existing) return { skipped: true, reason: 'already_started', escalationId: existing.id }
-
-  // Active medications
-  const { data: medications } = await supabase
-    .from('medications')
-    .select('id, name, nickname, dosage, reminder_times')
+  // Check if we already fired for this specific time slot today
+  const escalationKey = `${today}:${matchingTime}`
+  const { data: existingForSlot } = await supabase
+    .from('reminder_escalations')
+    .select('id')
     .eq('patient_id', patient.id)
-    .eq('active', true)
+    .eq('escalation_date', today)
+    .eq('time_slot', matchingTime)
+    .maybeSingle()
 
-  if (!medications || medications.length === 0) return { skipped: true, reason: 'no_active_medications' }
+  if (existingForSlot) return { skipped: true, reason: 'already_started_for_slot', escalationId: existingForSlot.id }
 
-  const tod = currentTimeOfDay(timezone)
-  const medsForTod = groupMedsByTimeOfDay(medications as MedForSms[], tod)
-  const medsToRemind = medsForTod.length > 0 ? medsForTod : (medications as MedForSms[])
   const medIds = medsToRemind.map((m: MedForSms) => m.id as string)
 
   // Caregiver name
@@ -99,6 +128,7 @@ async function startEscalationForPatient(
     .single()
   const caregiverName = profile?.full_name || 'your caregiver'
 
+  const tod = currentTimeOfDay(timezone)
   const firstName = patient.name.split(' ')[0]
   const texts = buildEscalationSmsTexts(firstName, medsToRemind, tod, caregiverName)
 
@@ -109,6 +139,7 @@ async function startEscalationForPatient(
       patient_id: patient.id,
       medication_ids: medIds,
       escalation_date: today,
+      time_slot: matchingTime,
       step: ESCALATION_STEPS.SMS1,
       status: 'pending',
     })
@@ -132,7 +163,7 @@ async function startEscalationForPatient(
       ownerId: patient.owner_id,
       eventType: 'sms_sent',
       patientName: patient.name,
-      internalDetails: { smsSid: msg.sid, escalationId: escalation.id, step: 1, tod },
+      internalDetails: { smsSid: msg.sid, escalationId: escalation.id, step: 1, timeSlot: matchingTime },
     })
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err)

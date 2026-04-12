@@ -162,27 +162,35 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ skipped: true, reason: 'sms_opted_out' })
     }
 
-    // 3. Check reminder_time window (only relevant for cron-driven calls;
-    //    manually triggered calls via TriggerCallButton bypass this check
-    //    by sending a patientId directly — that path is fine as-is).
-    //    We honour the window here so cron can call this endpoint for every
-    //    patient and let each decide for itself.
-    const reminderTime: string = patient.reminder_time ?? '08:00:00'
     // Derive timezone from state; fall back to stored timezone for legacy rows, then default
     const timezone: string = getTimezoneForState(patient.state ?? '') || patient.timezone || 'America/Chicago'
-    if (!isInReminderWindow(reminderTime, timezone)) {
-      return NextResponse.json({ skipped: true, reason: 'outside_reminder_window' })
-    }
 
     // ── Get active medications ────────────────────────────────────
-    const { data: medications } = await supabase
+    const { data: allMedications } = await supabase
       .from('medications')
       .select('*')
       .eq('patient_id', patientId)
       .eq('active', true)
+      .is('archived_at', null)
 
-    if (!medications || medications.length === 0) {
+    if (!allMedications || allMedications.length === 0) {
       return NextResponse.json({ error: 'No active medications' }, { status: 400 })
+    }
+
+    // Filter to only meds due in the current window (per reminder_times)
+    // If called from TriggerCallButton (manual), include all meds
+    const isManualTrigger = (body as any).manual === true
+    const today = new Date().toLocaleDateString('en-CA', { timeZone: timezone })
+    const medications = isManualTrigger
+      ? allMedications
+      : allMedications.filter((med: any) => {
+          const times: string[] = med.reminder_times || []
+          if (med.start_date && med.start_date > today) return false
+          return times.some((t: string) => isInReminderWindow(t, timezone))
+        })
+
+    if (!isManualTrigger && medications.length === 0) {
+      return NextResponse.json({ skipped: true, reason: 'no_meds_due_in_window' })
     }
 
     // ── Create dose log entries for today ────────────────────────
