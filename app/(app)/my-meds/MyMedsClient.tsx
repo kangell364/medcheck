@@ -1276,10 +1276,9 @@ export default function MyMedsClient({
                                     <button
                                       onClick={() => handleSlotAction(med, reminderTime, 'skipped')}
                                       disabled={isLoading || !!loadingMed}
-                                      className="px-4 py-4 border-2 border-gray-200 text-gray-500 font-semibold rounded-full text-lg hover:bg-gray-50 transition-colors disabled:opacity-60"
-                                      title="Skip this dose"
+                                      className="flex-1 border-2 border-gray-300 text-gray-600 font-bold py-4 px-4 rounded-full text-lg hover:bg-gray-50 transition-colors disabled:opacity-60"
                                     >
-                                      ⏭️
+                                      ⏭️ Skip
                                     </button>
                                   </div>
                                 )}
