@@ -693,6 +693,72 @@ export default function MyMedsClient({
   // We'll just use a generic label
   const caregiverName = 'your caregiver'
 
+  // ── Dashboard tab state ────────────────────────────────────────────────────
+  type DashTab = 'today' | 'history' | 'appointments' | 'report'
+  const [dashTab, setDashTab] = useState<DashTab>('today')
+
+  // ── Appointments state ────────────────────────────────────────────────────
+  interface ApptRow { id: string; doctor_name: string; appointment_date: string; appointment_time: string; location: string | null; appointment_type: string | null; notes: string | null; status: string | null }
+  const [appts, setAppts] = useState<ApptRow[]>([])
+  const [loadingAppts, setLoadingAppts] = useState(false)
+  const [showApptForm, setShowApptForm] = useState(false)
+  const [apptDoctor, setApptDoctor] = useState('')
+  const [apptDate, setApptDate] = useState('')
+  const [apptTime, setApptTime] = useState('')
+  const [apptLocation, setApptLocation] = useState('')
+  const [apptNotes, setApptNotes] = useState('')
+  const [savingAppt, setSavingAppt] = useState(false)
+
+  useEffect(() => {
+    if (dashTab !== 'appointments') return
+    setLoadingAppts(true)
+    supabase.from('appointments').select('*').eq('patient_id', patient.id).order('appointment_date', { ascending: true }).then(({ data }) => {
+      setAppts((data as ApptRow[]) || [])
+      setLoadingAppts(false)
+    })
+  }, [dashTab, patient.id, supabase])
+
+  async function saveAppt() {
+    if (!apptDoctor || !apptDate || !apptTime) return
+    setSavingAppt(true)
+    const { data } = await supabase.from('appointments').insert({ patient_id: patient.id, owner_id: patient.owner_id, doctor_name: apptDoctor, appointment_date: apptDate, appointment_time: apptTime, location: apptLocation || null, notes: apptNotes || null, status: 'upcoming' }).select().single()
+    if (data) { setAppts(prev => [...prev, data as ApptRow]); setShowApptForm(false); setApptDoctor(''); setApptDate(''); setApptTime(''); setApptLocation(''); setApptNotes('') }
+    setSavingAppt(false)
+  }
+
+  async function updateApptStatus(id: string, status: string) {
+    await supabase.from('appointments').update({ status }).eq('id', id)
+    setAppts(prev => prev.map(a => a.id === id ? { ...a, status } : a))
+  }
+
+  // ── History helpers ────────────────────────────────────────────────────────
+  const last30 = Array.from({ length: 30 }, (_, i) => { const d = new Date(); d.setDate(d.getDate() - (29 - i)); return d.toISOString().slice(0, 10) })
+  const logsByDate = new Map<string, Map<string, boolean>>()
+  for (const log of todayLogs) {
+    const dk = log.scheduled_at.slice(0, 10)
+    if (!logsByDate.has(dk)) logsByDate.set(dk, new Map())
+    logsByDate.get(dk)!.set(log.medication_id, !!log.confirmed)
+  }
+  const totalCells = medications.length * 30
+  let takenCells = 0
+  for (const [, medMap] of logsByDate) { for (const [, v] of medMap) { if (v) takenCells++ } }
+  const adherencePct = totalCells > 0 ? Math.round((takenCells / totalCells) * 100) : 0
+
+  // ── Report download ───────────────────────────────────────────────────────
+  const [downloadingReport, setDownloadingReport] = useState(false)
+  async function downloadReport() {
+    setDownloadingReport(true)
+    try {
+      const res = await fetch(`/api/report/patient/${patient.id}`)
+      if (res.ok) {
+        const blob = await res.blob()
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a'); a.href = url; a.download = `RxNudge-Report-${firstName}.pdf`; a.click()
+        URL.revokeObjectURL(url)
+      }
+    } finally { setDownloadingReport(false) }
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Top bar */}
@@ -794,7 +860,136 @@ export default function MyMedsClient({
         />
       )}
 
-      <div className="max-w-lg mx-auto px-4 py-6 pb-24">
+      {/* ── Tab Bar ─────────────────────────────────────────────────────── */}
+      <div className="sticky top-[65px] z-10 bg-white border-b border-gray-100">
+        <div className="max-w-lg mx-auto flex">
+          {([['today','💊','Today'],['history','📋','History'],['appointments','📅','Appts'],['report','📄','Report']] as [DashTab,string,string][]).map(([id,emoji,label]) => (
+            <button key={id} onClick={() => setDashTab(id)}
+              className={`flex-1 py-3 text-sm font-semibold flex flex-col items-center gap-0.5 border-b-2 transition-colors ${dashTab === id ? 'border-teal-500 text-teal-700' : 'border-transparent text-gray-400 hover:text-gray-600'}`}>
+              <span className="text-xl">{emoji}</span>
+              <span>{label}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* ── History Tab ──────────────────────────────────────────────────── */}
+      {dashTab === 'history' && (
+        <div className="max-w-lg mx-auto px-4 py-6 pb-24">
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">📋 My History</h2>
+          <p className="text-lg text-gray-500 mb-5">Last 30 days</p>
+          <div className="bg-white rounded-2xl border border-gray-100 p-4 mb-5 text-center">
+            <p className="text-5xl font-bold text-teal-600">{adherencePct}%</p>
+            <p className="text-lg text-gray-500 mt-1">Overall adherence</p>
+          </div>
+          {medications.length === 0 ? (
+            <p className="text-center text-gray-400 text-lg">No medications yet.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr>
+                    <th className="text-left text-sm text-gray-500 font-medium pr-2 pb-2 min-w-[80px]">Med</th>
+                    {last30.slice(-14).map(d => (
+                      <th key={d} className="text-center text-gray-400 pb-2 w-7">{new Date(d + 'T12:00:00').getDate()}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {medications.map(med => (
+                    <tr key={med.id}>
+                      <td className="text-sm text-gray-700 pr-2 py-1 truncate max-w-[80px]">{med.nickname || med.name}</td>
+                      {last30.slice(-14).map(d => {
+                        const taken = logsByDate.get(d)?.get(med.id)
+                        return (
+                          <td key={d} className="text-center py-1">
+                            <span className="text-base">{taken === true ? '✅' : taken === false ? '❌' : '⬜'}</span>
+                          </td>
+                        )
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <p className="text-xs text-gray-400 mt-3 text-center">Showing last 14 days</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Appointments Tab ─────────────────────────────────────────────── */}
+      {dashTab === 'appointments' && (
+        <div className="max-w-lg mx-auto px-4 py-6 pb-24">
+          <div className="flex items-center justify-between mb-5">
+            <h2 className="text-2xl font-bold text-gray-900">📅 Appointments</h2>
+            <button onClick={() => setShowApptForm(true)} className="bg-teal-600 hover:bg-teal-700 text-white font-semibold py-2 px-4 rounded-xl text-sm transition-colors">+ Add</button>
+          </div>
+          {showApptForm && (
+            <div className="bg-white rounded-2xl border border-teal-200 p-5 mb-5 space-y-3">
+              <h3 className="text-lg font-bold text-gray-900">New Appointment</h3>
+              <input type="text" placeholder="Doctor / Clinic name *" value={apptDoctor} onChange={e => setApptDoctor(e.target.value)} className="w-full px-4 py-3 rounded-xl border border-gray-200 text-lg focus:outline-none focus:ring-2 focus:ring-teal-500" />
+              <div className="grid grid-cols-2 gap-3">
+                <input type="date" value={apptDate} onChange={e => setApptDate(e.target.value)} className="w-full px-4 py-3 rounded-xl border border-gray-200 text-lg focus:outline-none focus:ring-2 focus:ring-teal-500" />
+                <input type="time" value={apptTime} onChange={e => setApptTime(e.target.value)} className="w-full px-4 py-3 rounded-xl border border-gray-200 text-lg focus:outline-none focus:ring-2 focus:ring-teal-500" />
+              </div>
+              <input type="text" placeholder="Location (optional)" value={apptLocation} onChange={e => setApptLocation(e.target.value)} className="w-full px-4 py-3 rounded-xl border border-gray-200 text-lg focus:outline-none focus:ring-2 focus:ring-teal-500" />
+              <textarea placeholder="Notes (optional)" value={apptNotes} onChange={e => setApptNotes(e.target.value)} rows={2} className="w-full px-4 py-3 rounded-xl border border-gray-200 text-lg focus:outline-none focus:ring-2 focus:ring-teal-500 resize-none" />
+              <div className="flex gap-3">
+                <button onClick={saveAppt} disabled={savingAppt || !apptDoctor || !apptDate || !apptTime} className="flex-1 bg-teal-600 hover:bg-teal-700 text-white font-bold py-3 rounded-xl text-lg disabled:opacity-50 transition-colors">{savingAppt ? 'Saving…' : 'Save'}</button>
+                <button onClick={() => setShowApptForm(false)} className="flex-1 border border-gray-200 text-gray-600 font-medium py-3 rounded-xl text-lg hover:bg-gray-50 transition-colors">Cancel</button>
+              </div>
+            </div>
+          )}
+          {loadingAppts ? (
+            <p className="text-center text-gray-400 text-lg py-8">Loading…</p>
+          ) : appts.length === 0 ? (
+            <div className="bg-white rounded-2xl border-2 border-dashed border-gray-200 p-10 text-center">
+              <div className="text-5xl mb-3">📅</div>
+              <p className="text-xl text-gray-500">No appointments yet</p>
+              <button onClick={() => setShowApptForm(true)} className="mt-4 text-teal-600 text-lg font-semibold underline">Add your first one</button>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {appts.map(a => (
+                <div key={a.id} className={`bg-white rounded-2xl border p-5 ${a.status === 'completed' ? 'opacity-60 border-gray-100' : 'border-gray-200'}`}>
+                  <div className="flex items-start justify-between mb-2">
+                    <div>
+                      <p className="text-xl font-bold text-gray-900">{a.doctor_name}</p>
+                      <p className="text-lg text-gray-600">{new Date(a.appointment_date + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })} at {a.appointment_time}</p>
+                      {a.location && <p className="text-base text-gray-500">📍 {a.location}</p>}
+                      {a.notes && <p className="text-base text-gray-500 mt-1 italic">{a.notes}</p>}
+                    </div>
+                    <span className={`text-xs font-semibold px-2 py-1 rounded-full ml-2 shrink-0 ${a.status === 'completed' ? 'bg-green-100 text-green-700' : a.status === 'cancelled' ? 'bg-gray-100 text-gray-500' : 'bg-blue-100 text-blue-700'}`}>{a.status || 'upcoming'}</span>
+                  </div>
+                  {a.status !== 'completed' && a.status !== 'cancelled' && (
+                    <div className="flex gap-2 mt-3">
+                      <button onClick={() => updateApptStatus(a.id, 'completed')} className="flex-1 border border-green-300 text-green-700 font-medium py-2 rounded-xl text-sm hover:bg-green-50 transition-colors">✅ Done</button>
+                      <button onClick={() => updateApptStatus(a.id, 'cancelled')} className="flex-1 border border-gray-200 text-gray-500 font-medium py-2 rounded-xl text-sm hover:bg-gray-50 transition-colors">❌ Cancel</button>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Report Tab ───────────────────────────────────────────────────── */}
+      {dashTab === 'report' && (
+        <div className="max-w-lg mx-auto px-4 py-10 pb-24 text-center">
+          <div className="text-7xl mb-5">📄</div>
+          <h2 className="text-3xl font-bold text-gray-900 mb-3">My Medication Report</h2>
+          <p className="text-xl text-gray-500 mb-8">Download a PDF summary of your medication history and adherence.</p>
+          <button onClick={downloadReport} disabled={downloadingReport}
+            className="w-full bg-teal-600 hover:bg-teal-700 text-white font-bold py-5 px-6 rounded-2xl text-2xl transition-colors disabled:opacity-60 shadow-md">
+            {downloadingReport ? '⏳ Generating…' : '📄 Download My Report'}
+          </button>
+          <p className="text-base text-gray-400 mt-5">Your caregiver can also download this report from their dashboard.</p>
+        </div>
+      )}
+
+      {/* ── Today Tab ────────────────────────────────────────────────────── */}
+      {dashTab === 'today' && <div className="max-w-lg mx-auto px-4 py-6 pb-24">
         {/* Greeting */}
         <div className="mb-6">
           <h1 className="text-3xl font-bold text-gray-900">
@@ -1022,7 +1217,7 @@ export default function MyMedsClient({
             )}
           </div>
         )}
-      </div>
+      </div>}{/* end Today tab */}
     </div>
   )
 }
