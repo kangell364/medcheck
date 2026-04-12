@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react'
 import { Medication, DoseLog, Patient } from '@/lib/types'
 import ConsentScreenClient from '@/components/ConsentScreenClient'
-import InstallStep from '@/components/InstallStep'
 import AccountStep from '@/components/AccountStep'
 import MyMedsClient from '@/app/(app)/my-meds/MyMedsClient'
 
@@ -23,17 +22,7 @@ export interface PatientOnboardingData {
   todayLocalStr?: string
 }
 
-type Step = 'consent' | 'install' | 'account' | 'meds'
-
-function isStandalone(): boolean {
-  if (typeof window === 'undefined') return false
-  return window.matchMedia('(display-mode: standalone)').matches
-}
-
-function isInstallDismissed(): boolean {
-  if (typeof window === 'undefined') return false
-  return localStorage.getItem('rxnudge_install_dismissed') === '1'
-}
+type Step = 'consent' | 'account' | 'meds'
 
 function isAccountSkipped(): boolean {
   if (typeof window === 'undefined') return false
@@ -41,11 +30,8 @@ function isAccountSkipped(): boolean {
 }
 
 function stepAfterConsent(hasAccount: boolean): Step {
-  if (isStandalone() || isInstallDismissed()) {
-    if (hasAccount || isAccountSkipped()) return 'meds'
-    return 'account'
-  }
-  return 'install'
+  if (hasAccount || isAccountSkipped()) return 'meds'
+  return 'account'
 }
 
 export default function PatientOnboarding({
@@ -65,8 +51,8 @@ export default function PatientOnboarding({
 
   const [step, setStep] = useState<Step>(() => {
     if (!hasConsented) return 'consent'
-    // Start at install; useEffect will refine based on localStorage
-    return 'install'
+    // Start at account; useEffect will refine based on localStorage
+    return 'account'
   })
 
   // Refine step client-side once localStorage is available
@@ -78,15 +64,6 @@ export default function PatientOnboarding({
   // ── Consent ──────────────────────────────────────────────────────────────
   const handleConsentAccepted = () => {
     setStep(stepAfterConsent(hasAccount))
-  }
-
-  // ── Install ───────────────────────────────────────────────────────────────
-  const handleInstallDone = () => {
-    if (hasAccount || isAccountSkipped()) {
-      setStep('meds')
-    } else {
-      setStep('account')
-    }
   }
 
   // ── Account ───────────────────────────────────────────────────────────────
@@ -108,10 +85,6 @@ export default function PatientOnboarding({
         onAccepted={handleConsentAccepted}
       />
     )
-  }
-
-  if (step === 'install') {
-    return <InstallStep onDone={handleInstallDone} />
   }
 
   if (step === 'account') {

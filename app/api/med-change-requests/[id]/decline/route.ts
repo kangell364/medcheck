@@ -69,24 +69,6 @@ export async function POST(
       sent_at: new Date().toISOString(),
     })
 
-    // Push to member
-    try {
-      await fetch(`${process.env.NEXT_PUBLIC_APP_URL || ''}/api/push/send`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          patient_id: req.patient_id,
-          title: '❌ Request Reviewed',
-          body: caregiver_note
-            ? `Your request was declined: ${caregiver_note}`
-            : 'Your request was reviewed by your caregiver.',
-          data: { url: '/my-meds' },
-        }),
-      })
-    } catch (pushErr) {
-      console.warn('member push failed:', pushErr)
-    }
-
     return NextResponse.json({ ok: true })
   } catch (err) {
     console.error('decline route error:', err)

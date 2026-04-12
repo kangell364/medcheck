@@ -91,25 +91,6 @@ export async function POST(
       sent_at: new Date().toISOString(),
     })
 
-    // Push notification to member
-    try {
-      const pushBody = isNew
-        ? `Your new medication request was approved! 🎉`
-        : `Your change request was approved! 🎉`
-      await fetch(`${process.env.NEXT_PUBLIC_APP_URL || ''}/api/push/send`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          patient_id: req.patient_id,
-          title: '✅ Request Approved',
-          body: pushBody,
-          data: { url: '/my-meds' },
-        }),
-      })
-    } catch (pushErr) {
-      console.warn('member push failed:', pushErr)
-    }
-
     return NextResponse.json({ ok: true })
   } catch (err) {
     console.error('approve route error:', err)

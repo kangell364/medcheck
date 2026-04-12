@@ -118,36 +118,6 @@ export async function POST(request: NextRequest) {
       sent_at: new Date().toISOString(),
     })
 
-    // Send push notification to caregiver (they have a push sub keyed to their patient record if self)
-    // Caregiver push subs are stored under their own patient record (owner). Try owner_id lookup.
-    // We send to the owner's user push sub if it exists (stored by owner_id in push_subscriptions via user_id col if present)
-    // For now, look for push_subscriptions where patient.owner_id matches a patient.user_id
-    try {
-      const { data: caregiverPatient } = await admin
-        .from('patients')
-        .select('id')
-        .eq('user_id', patient.owner_id)
-        .maybeSingle()
-
-      if (caregiverPatient) {
-        const pushTitle = isNew ? '💊 New Medication Request' : '💬 Medication Change Request'
-        const pushBody = displayMessage.slice(0, 120)
-        await fetch(`${process.env.NEXT_PUBLIC_APP_URL || ''}/api/push/send`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            patient_id: caregiverPatient.id,
-            title: pushTitle,
-            body: pushBody,
-            data: { url: '/alerts' },
-          }),
-        })
-      }
-    } catch (pushErr) {
-      // Non-fatal
-      console.warn('caregiver push failed:', pushErr)
-    }
-
     return NextResponse.json({ ok: true, id: changeReq.id })
   } catch (err) {
     console.error('med-change-requests POST error:', err)
