@@ -153,14 +153,67 @@ export default function PatientTabs({
 
   // ─── Medication helpers ─────────────────────────────────────────────────
 
-  const getMedStatus = (medId: string) => {
-    // Check optimistic snooze state first (set after user clicks Snooze)
+  // Extract HH:MM from a scheduled_at ISO string in patient's timezone
+  function getLogTimeInTz(isoStr: string): string {
+    try {
+      const d = new Date(isoStr)
+      const parts = new Intl.DateTimeFormat('en-US', {
+        timeZone: patient.timezone,
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false,
+      }).formatToParts(d)
+      const h = parts.find(p => p.type === 'hour')?.value ?? '00'
+      const m = parts.find(p => p.type === 'minute')?.value ?? '00'
+      const normalizedH = h === '24' ? '00' : h
+      return `${normalizedH}:${m}`
+    } catch {
+      return '00:00'
+    }
+  }
+
+  // Find the dose_log for a specific med + reminder_time slot
+  function getSlotLog(medId: string, reminderTime: string): DoseLog | undefined {
+    const med = medications.find(m => m.id === medId)
+    if (!med) return undefined
+    // Check optimistic snooze — doesn't apply per-slot directly, use first slot
+    // Look for a log where scheduled_at matches the reminder_time within 90 min tolerance
+    const [rh, rm] = reminderTime.split(':').map(Number)
+    const rtMins = rh * 60 + rm
+    let best: DoseLog | undefined
+    let bestDiff = Infinity
+    for (const log of todayLogs) {
+      if (log.medication_id !== medId) continue
+      const lt = getLogTimeInTz(log.scheduled_at)
+      const [lh, lm] = lt.split(':').map(Number)
+      const diff = Math.abs(lh * 60 + lm - rtMins)
+      if (diff < bestDiff && diff <= 90) {
+        bestDiff = diff
+        best = log
+      }
+    }
+    return best
+  }
+
+  // Slot status: confirmed | missed | skipped | snoozed | pending
+  function getSlotStatus(medId: string, reminderTime: string): 'confirmed' | 'missed' | 'skipped' | 'snoozed' | 'pending' {
     const optimisticSnooze = snoozeMap[medId]
     if (optimisticSnooze && new Date(optimisticSnooze) > new Date()) return 'snoozed'
-    const log = todayLogs.find(l => l.medication_id === medId)
-    if (!log) return 'pending'
+
+    const log = getSlotLog(medId, reminderTime)
+    if (!log) {
+      // Check if past due
+      const [rh, rm] = reminderTime.split(':').map(Number)
+      const patientNow = new Date(new Date().toLocaleString('en-US', { timeZone: patient.timezone }))
+      const currentMins = patientNow.getHours() * 60 + patientNow.getMinutes()
+      const slotMins = rh * 60 + rm
+      // If past due by > 30 min and no log, mark as missed
+      if (currentMins > slotMins + 30) return 'missed'
+      return 'pending'
+    }
     if (log.snooze_until && new Date(log.snooze_until) > new Date()) return 'snoozed'
     if (log.confirmed === true) return 'confirmed'
+    if (log.method === 'manual' && log.confirmed === false) return 'skipped'
     if (log.confirmed === false) return 'missed'
     return 'pending'
   }
@@ -288,16 +341,25 @@ export default function PatientTabs({
             ) : (
               <div className="space-y-3">
                 {medications.map(med => {
-                  const status = getMedStatus(med.id)
-                  const config = statusConfig[status]
-                  const log = todayLogs.find(l => l.medication_id === med.id)
+                  const times = med.reminder_times?.length > 0 ? med.reminder_times : ['00:00']
                   const pendingCallback = getPendingCallback(med.id)
+                  // Overall med-level status: use first non-pending slot or pending
+                  const overallStatus = (() => {
+                    const optimisticSnooze = snoozeMap[med.id]
+                    if (optimisticSnooze && new Date(optimisticSnooze) > new Date()) return 'snoozed'
+                    const allConfirmed = times.every(rt => getSlotStatus(med.id, rt) === 'confirmed')
+                    if (allConfirmed) return 'confirmed'
+                    const anyMissed = times.some(rt => getSlotStatus(med.id, rt) === 'missed')
+                    if (anyMissed) return 'missed'
+                    return 'pending'
+                  })()
+                  const overallConfig = statusConfig[overallStatus] || statusConfig.pending
 
                   return (
-                    <div key={med.id} className={`bg-white rounded-2xl border-2 p-5 ${config.class}`}>
-                      <div className="flex items-start justify-between">
+                    <div key={med.id} className={`bg-white rounded-2xl border-2 p-5 ${overallConfig.class}`}>
+                      <div className="flex items-start justify-between mb-3">
                         <div className="flex items-start gap-3">
-                          <span className="text-2xl mt-0.5">{config.icon}</span>
+                          <span className="text-2xl mt-0.5">{overallConfig.icon}</span>
                           <div>
                             <h3 className="font-bold text-gray-900 text-2xl">{med.name}</h3>
                             {(med as any).nickname && (
@@ -306,13 +368,6 @@ export default function PatientTabs({
                             {med.dosage && /[a-zA-Z]/.test(med.dosage) && (
                               <p className="text-base text-gray-600">{med.dosage}</p>
                             )}
-                            <div className="flex flex-wrap gap-2 mt-2">
-                              {med.reminder_times.map(t => (
-                                <span key={t} className="text-sm font-semibold bg-white/80 px-3 py-1 rounded-full text-gray-700 border border-gray-200">
-                                  🕐 {formatTimeInTz(t, patient.timezone)}
-                                </span>
-                              ))}
-                            </div>
                             {pendingCallback && (
                               <span className="inline-flex items-center gap-1 mt-2 text-xs font-semibold bg-orange-100 text-orange-700 px-2.5 py-1 rounded-full border border-orange-200">
                                 📞 Callback at {formatIsoInTz(pendingCallback.scheduled_for, patient.timezone)}
@@ -321,7 +376,7 @@ export default function PatientTabs({
                           </div>
                         </div>
                         <div className="flex flex-col items-end gap-2">
-                          {status === 'snoozed' ? (
+                          {overallStatus === 'snoozed' ? (
                             <div className="flex flex-col items-end gap-0.5">
                               <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-50 border border-amber-200 text-amber-700">
                                 ⏰ Snoozed
@@ -333,31 +388,64 @@ export default function PatientTabs({
                               )}
                             </div>
                           ) : (
-                            <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${config.class}`}>
-                              {config.label}
+                            <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${overallConfig.class}`}>
+                              {overallConfig.label}
                             </span>
-                          )}
-                          {status !== 'confirmed' && status !== 'snoozed' && (
-                            <ManualLogButton
-                              medicationId={med.id}
-                              patientId={patient.id}
-                              medicationName={med.name}
-                              scheduledAt={todayStr}
-                              snoozeUntil={getMedSnoozeUntil(med.id)}
-                              scheduledTime={getRelevantReminderTime(med.reminder_times)}
-                              patientTimezone={patient.timezone}
-                              onSnooze={(su) => handleMedSnooze(med.id, su)}
-                            />
                           )}
                         </div>
                       </div>
-                      {log?.confirmed_at && status !== 'snoozed' && (
-                        <p className="text-xs text-gray-400 mt-2 ml-9">
-                          {status === 'confirmed' ? 'Confirmed' : 'Recorded'} at {formatIsoInTz(log.confirmed_at, patient.timezone)}
-                          {log.method && ` via ${log.method}`}
-                        </p>
-                      )}
-                      <div className="flex items-center gap-3 mt-3 ml-9">
+
+                      {/* Per-time-slot rows */}
+                      <div className="space-y-2 mb-3">
+                        {times.map(rt => {
+                          const slotStatus = overallStatus === 'snoozed' ? 'snoozed' : getSlotStatus(med.id, rt)
+                          const slotLog = getSlotLog(med.id, rt)
+
+                          const slotStatusConfig = {
+                            confirmed: { icon: '✅', label: 'Taken', class: 'bg-emerald-50 border-emerald-200 text-emerald-700' },
+                            missed: { icon: '❌', label: 'Missed', class: 'bg-red-50 border-red-200 text-red-700' },
+                            skipped: { icon: '⏭️', label: 'Skipped', class: 'bg-gray-50 border-gray-200 text-gray-500' },
+                            snoozed: { icon: '😴', label: 'Snoozed', class: 'bg-amber-50 border-amber-200 text-amber-700' },
+                            pending: { icon: '⏳', label: 'Pending', class: 'bg-white border-gray-100 text-gray-500' },
+                          }[slotStatus] || { icon: '⏳', label: 'Pending', class: 'bg-white border-gray-100 text-gray-500' }
+
+                          return (
+                            <div key={rt} className={`flex items-center justify-between rounded-xl border p-3 ${slotStatusConfig.class}`}>
+                              <div className="flex items-center gap-2">
+                                <span className="text-base">{slotStatusConfig.icon}</span>
+                                <span className="text-sm font-semibold text-gray-700">
+                                  {formatTimeInTz(rt, patient.timezone)}
+                                </span>
+                                {slotStatus === 'confirmed' && slotLog?.confirmed_at && (
+                                  <span className="text-xs text-gray-400">
+                                    at {formatIsoInTz(slotLog.confirmed_at, patient.timezone)}
+                                    {slotLog.method && ` via ${slotLog.method}`}
+                                  </span>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className={`text-xs font-semibold px-2 py-0.5 rounded-full border ${slotStatusConfig.class}`}>
+                                  {slotStatusConfig.label}
+                                </span>
+                                {slotStatus !== 'confirmed' && slotStatus !== 'snoozed' && (
+                                  <ManualLogButton
+                                    medicationId={med.id}
+                                    patientId={patient.id}
+                                    medicationName={med.name}
+                                    scheduledAt={todayStr}
+                                    snoozeUntil={getMedSnoozeUntil(med.id)}
+                                    scheduledTime={rt}
+                                    patientTimezone={patient.timezone}
+                                    onSnooze={(su) => handleMedSnooze(med.id, su)}
+                                  />
+                                )}
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+
+                      <div className="flex items-center gap-3 mt-1">
                         <Link
                           href={`/patients/${patient.id}/medications/${med.id}/edit`}
                           className="text-xs text-gray-400 hover:text-teal-600 transition-colors"

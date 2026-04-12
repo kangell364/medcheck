@@ -36,6 +36,13 @@ interface MedRequestState {
   caregiverNote?: string | null
 }
 
+// Slot log shape used in slotLogMap
+interface SlotLog {
+  confirmed: boolean | null
+  method: string | null
+  confirmed_at: string | null
+}
+
 const FREQUENCY_OPTIONS = [
   { value: 'once', label: 'Once daily' },
   { value: 'twice', label: 'Twice daily' },
@@ -492,6 +499,7 @@ export default function MyMedsClient({
     day: 'numeric',
   })
 
+  // loggedMeds: Map<"med_id:HH:MM", "ISO timestamp" | "skipped">
   const [loggedMeds, setLoggedMeds] = useState<Map<string, string>>(new Map())
   const [loadingMed, setLoadingMed] = useState<string | null>(null)
   const [expanded, setExpanded] = useState<Set<TimeOfDay>>(new Set(['morning']))
@@ -511,6 +519,19 @@ export default function MyMedsClient({
   const [toast, setToast] = useState<string | null>(null)
   // Flash med IDs that just got approved
   const [approvedFlash, setApprovedFlash] = useState<Set<string>>(new Set())
+
+  // ── Build slotLogMap: "med_id:HH:MM" → SlotLog ─────────────────────────
+  const slotLogMap = new Map<string, SlotLog>()
+  for (const log of todayLogs) {
+    // scheduled_at may be "2026-04-11T08:00:00" or ISO with TZ
+    const timeStr = log.scheduled_at.slice(11, 16) // "08:00"
+    const key = `${log.medication_id}:${timeStr}`
+    slotLogMap.set(key, {
+      confirmed: log.confirmed,
+      method: log.method,
+      confirmed_at: log.confirmed_at,
+    })
+  }
 
   // Load existing pending change requests on mount
   useEffect(() => {
@@ -610,58 +631,32 @@ export default function MyMedsClient({
     setTimeout(() => setToast(null), 4000)
   }
 
-  const serverLogged = new Map<string, string>()
-  for (const log of todayLogs) {
-    if (log.confirmed === true && log.confirmed_at) {
-      serverLogged.set(log.medication_id, log.confirmed_at)
-    }
-  }
-
-  const allLogged = new Map([...serverLogged, ...loggedMeds])
-
-  async function handleTookIt(med: Medication) {
-    if (loadingMed) return
-    setLoadingMed(med.id)
-
-    const now = new Date()
-    const takenAt = now.toISOString()
+  // ── Per-slot action handler ──────────────────────────────────────────────
+  async function handleSlotAction(med: Medication, reminderTime: string, action: 'taken' | 'skipped') {
+    const key = `${med.id}:${reminderTime}`
+    if (loadingMed === key) return
+    setLoadingMed(key)
 
     try {
-      const today = new Date()
-      today.setHours(0, 0, 0, 0)
-      const tomorrow = new Date(today)
-      tomorrow.setDate(tomorrow.getDate() + 1)
+      const res = await fetch('/api/dose-log', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          patient_id: patient.id,
+          medication_id: med.id,
+          reminder_time: reminderTime,
+          action,
+          timezone: (patient.timezone as string) || patientTimezone || 'America/Chicago',
+        }),
+      })
 
-      const { data: existing } = await supabase
-        .from('dose_logs')
-        .select('id')
-        .eq('patient_id', patient.id)
-        .eq('medication_id', med.id)
-        .gte('scheduled_at', today.toISOString())
-        .lt('scheduled_at', tomorrow.toISOString())
-        .limit(1)
-        .single()
-
-      if (existing) {
-        await supabase
-          .from('dose_logs')
-          .update({ confirmed: true, confirmed_at: takenAt, method: 'app' })
-          .eq('id', existing.id)
-      } else {
-        await supabase
-          .from('dose_logs')
-          .insert({
-            patient_id: patient.id,
-            medication_id: med.id,
-            medication_name: med.nickname || med.name,
-            scheduled_at: takenAt,
-            confirmed: true,
-            confirmed_at: takenAt,
-            method: 'app',
-          })
+      if (res.ok) {
+        setLoggedMeds(prev => {
+          const next = new Map(prev)
+          next.set(key, action === 'taken' ? new Date().toISOString() : 'skipped')
+          return next
+        })
       }
-
-      setLoggedMeds(prev => new Map(prev).set(med.id, takenAt))
     } catch (err) {
       console.error('Failed to log dose:', err)
     } finally {
@@ -669,8 +664,37 @@ export default function MyMedsClient({
     }
   }
 
-  const groups: Record<TimeOfDay, Medication[]> = { morning: [], afternoon: [], evening: [] }
+  // ── Helper to get slot status ────────────────────────────────────────────
+  function getSlotStatus(med: Medication, reminderTime: string): {
+    isTaken: boolean
+    isSkipped: boolean
+    takenAt: string | null
+  } {
+    const key = `${med.id}:${reminderTime}`
 
+    // Check optimistic state first
+    const optimistic = loggedMeds.get(key)
+    if (optimistic) {
+      if (optimistic === 'skipped') return { isTaken: false, isSkipped: true, takenAt: null }
+      return { isTaken: true, isSkipped: false, takenAt: optimistic }
+    }
+
+    // Fall back to server data
+    const serverLog = slotLogMap.get(key)
+    if (serverLog) {
+      if (serverLog.method === 'skipped' || serverLog.confirmed === false) {
+        return { isTaken: false, isSkipped: serverLog.method === 'skipped', takenAt: null }
+      }
+      if (serverLog.confirmed === true) {
+        return { isTaken: true, isSkipped: false, takenAt: serverLog.confirmed_at }
+      }
+    }
+
+    return { isTaken: false, isSkipped: false, takenAt: null }
+  }
+
+  // ── Group medications by time-of-day (based on first reminder time) ──────
+  const groups: Record<TimeOfDay, Medication[]> = { morning: [], afternoon: [], evening: [] }
   for (const med of medications) {
     const times = med.reminder_times || []
     if (times.length === 0) {
@@ -686,11 +710,15 @@ export default function MyMedsClient({
     { key: 'evening' as TimeOfDay, label: 'Evening Medications', icon: '🌙' },
   ]
 
-  const allMedsToday = medications.length
-  const takenToday = medications.filter(m => allLogged.has(m.id)).length
+  // ── Today's progress: count total slots and taken slots ──────────────────
+  const allMedsToday = medications.reduce((sum, m) => sum + (m.reminder_times?.length || 1), 0)
+  const takenToday = medications.reduce((sum, m) => {
+    return sum + (m.reminder_times?.length ? m.reminder_times : ['08:00']).filter(t => {
+      const { isTaken } = getSlotStatus(m, t)
+      return isTaken
+    }).length
+  }, 0)
 
-  // Caregiver first name (from patient.name — crude but works for "Jinky's caregiver is Keith")
-  // We'll just use a generic label
   const caregiverName = 'your caregiver'
 
   // ── Dashboard tab state ────────────────────────────────────────────────────
@@ -732,16 +760,60 @@ export default function MyMedsClient({
   }
 
   // ── History helpers ────────────────────────────────────────────────────────
-  const last30 = Array.from({ length: 30 }, (_, i) => { const d = new Date(); d.setDate(d.getDate() - (29 - i)); return d.toISOString().slice(0, 10) })
-  const logsByDate = new Map<string, Map<string, boolean>>()
-  for (const log of todayLogs) {
-    const dk = log.scheduled_at.slice(0, 10)
-    if (!logsByDate.has(dk)) logsByDate.set(dk, new Map())
-    logsByDate.get(dk)!.set(log.medication_id, !!log.confirmed)
+  // We need all logs for history — todayLogs only covers today.
+  // For now use todayLogs for today and a separate fetch for history.
+  const [allLogs, setAllLogs] = useState<DoseLog[] | null>(null)
+
+  useEffect(() => {
+    if (dashTab !== 'history') return
+    if (allLogs !== null) return
+    const thirtyDaysAgo = new Date()
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
+    supabase
+      .from('dose_logs')
+      .select('*')
+      .eq('patient_id', patient.id)
+      .gte('scheduled_at', thirtyDaysAgo.toISOString())
+      .order('scheduled_at', { ascending: false })
+      .then(({ data }) => {
+        setAllLogs((data as DoseLog[]) || [])
+      })
+  }, [dashTab, patient.id, supabase, allLogs])
+
+  const last30 = Array.from({ length: 30 }, (_, i) => {
+    const d = new Date()
+    d.setDate(d.getDate() - (29 - i))
+    return d.toISOString().slice(0, 10)
+  })
+
+  // Build history slots: one per med per reminder_time
+  const historySlots: Array<{ med: Medication; time: string; label: string }> = []
+  for (const med of medications) {
+    const times = med.reminder_times?.length ? med.reminder_times : ['08:00']
+    times.forEach((t, i) => {
+      historySlots.push({
+        med,
+        time: t,
+        label: i === 0 ? (med.nickname || med.name) : `  ↳ ${formatReminderTime(t)}`,
+      })
+    })
   }
-  const totalCells = medications.length * 30
+
+  // Adherence calculation based on history slots × 30 days
+  const totalCells = historySlots.length * 30
   let takenCells = 0
-  for (const [, medMap] of logsByDate) { for (const [, v] of medMap) { if (v) takenCells++ } }
+  if (allLogs) {
+    for (const slot of historySlots) {
+      for (const day of last30) {
+        const log = allLogs.find(l =>
+          l.medication_id === slot.med.id &&
+          l.scheduled_at.startsWith(day) &&
+          l.scheduled_at.includes(`T${slot.time}`)
+        )
+        if (log?.confirmed === true) takenCells++
+      }
+    }
+  }
   const adherencePct = totalCells > 0 ? Math.round((takenCells / totalCells) * 100) : 0
 
   // ── Report download ───────────────────────────────────────────────────────
@@ -884,26 +956,38 @@ export default function MyMedsClient({
           </div>
           {medications.length === 0 ? (
             <p className="text-center text-gray-400 text-lg">No medications yet.</p>
+          ) : allLogs === null ? (
+            <p className="text-center text-gray-400 text-lg py-8">Loading history…</p>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-xs">
                 <thead>
                   <tr>
-                    <th className="text-left text-sm text-gray-500 font-medium pr-2 pb-2 min-w-[80px]">Med</th>
+                    <th className="text-left text-sm text-gray-500 font-medium pr-2 pb-2 min-w-[90px]">Med / Time</th>
                     {last30.slice(-14).map(d => (
                       <th key={d} className="text-center text-gray-400 pb-2 w-7">{new Date(d + 'T12:00:00').getDate()}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
-                  {medications.map(med => (
-                    <tr key={med.id}>
-                      <td className="text-sm text-gray-700 pr-2 py-1 truncate max-w-[80px]">{med.nickname || med.name}</td>
+                  {historySlots.map((slot, idx) => (
+                    <tr key={`${slot.med.id}:${slot.time}:${idx}`}>
+                      <td className="text-sm text-gray-700 pr-2 py-1 truncate max-w-[90px]">
+                        {slot.label}
+                        {slot.med.reminder_times?.length > 1 && idx === historySlots.findIndex(s => s.med.id === slot.med.id) && (
+                          <span className="ml-1 text-xs text-gray-400">{formatReminderTime(slot.time)}</span>
+                        )}
+                      </td>
                       {last30.slice(-14).map(d => {
-                        const taken = logsByDate.get(d)?.get(med.id)
+                        const log = allLogs.find(l =>
+                          l.medication_id === slot.med.id &&
+                          l.scheduled_at.startsWith(d) &&
+                          l.scheduled_at.includes(`T${slot.time}`)
+                        )
+                        const cell = log?.confirmed ? '✅' : log?.method === 'skipped' ? '⏭️' : '⬜'
                         return (
                           <td key={d} className="text-center py-1">
-                            <span className="text-base">{taken === true ? '✅' : taken === false ? '❌' : '⬜'}</span>
+                            <span className="text-base">{cell}</span>
                           </td>
                         )
                       })}
@@ -1065,13 +1149,19 @@ export default function MyMedsClient({
           </div>
         )}
 
-        {/* Medication sections */}
+        {/* Medication sections — one row per reminder_time slot */}
         {sectionConfig.map(({ key, label, icon }) => {
           const meds = groups[key]
           if (meds.length === 0) return null
 
           const isExpanded = expanded.has(key)
-          const doneCount = meds.filter(m => allLogged.has(m.id)).length
+
+          // Count total slots and taken slots for this section
+          const totalSlots = meds.reduce((s, m) => s + (m.reminder_times?.length || 1), 0)
+          const doneSlots = meds.reduce((s, m) => {
+            const times = m.reminder_times?.length ? m.reminder_times : ['08:00']
+            return s + times.filter(t => getSlotStatus(m, t).isTaken).length
+          }, 0)
 
           return (
             <div key={key} className="mb-4">
@@ -1091,7 +1181,7 @@ export default function MyMedsClient({
                     <span className="text-xl font-bold text-gray-800">{label}</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="text-lg text-gray-500">{doneCount}/{meds.length}</span>
+                    <span className="text-lg text-gray-500">{doneSlots}/{totalSlots}</span>
                     <span className="text-gray-400 text-lg">{isExpanded ? '▲' : '▼'}</span>
                   </div>
                 </div>
@@ -1100,9 +1190,7 @@ export default function MyMedsClient({
               {isExpanded && (
                 <div className="space-y-3">
                   {meds.map(med => {
-                    const takenAt = allLogged.get(med.id)
-                    const isTaken = !!takenAt
-                    const isLoading = loadingMed === med.id
+                    const times = med.reminder_times?.length ? med.reminder_times : ['08:00']
                     const reqState = medRequestState.get(med.id)
                     const isFlashing = approvedFlash.has(med.id)
 
@@ -1110,17 +1198,13 @@ export default function MyMedsClient({
                       <div
                         key={med.id}
                         className={`bg-white rounded-2xl border-2 p-5 transition-all ${
-                          isFlashing
-                            ? 'border-emerald-400 bg-emerald-50 animate-pulse'
-                            : isTaken
-                              ? 'border-emerald-200 bg-emerald-50'
-                              : 'border-gray-100'
+                          isFlashing ? 'border-emerald-400 bg-emerald-50 animate-pulse' : 'border-gray-100'
                         }`}
                       >
-                        {/* Medication name */}
-                        <div className="mb-4">
+                        {/* Medication name + details */}
+                        <div className="mb-3">
                           <div className="flex items-center gap-2 mb-1">
-                            <span className="text-2xl">{isTaken ? '✅' : '💊'}</span>
+                            <span className="text-2xl">💊</span>
                             <p className="text-2xl font-bold text-gray-900">
                               {med.nickname || med.name}
                             </p>
@@ -1131,27 +1215,76 @@ export default function MyMedsClient({
                           {med.dosage && (
                             <p className="text-lg text-gray-500 ml-8">{med.dosage}</p>
                           )}
-                          {med.reminder_times?.[0] && (
-                            <p className="text-base text-gray-400 ml-8">
-                              ⏰ {formatReminderTime(med.reminder_times[0])}
-                            </p>
-                          )}
                         </div>
 
-                        {/* Took it button */}
-                        {isTaken ? (
-                          <div className="w-full bg-emerald-100 text-emerald-700 font-semibold py-4 px-6 rounded-full text-xl text-center">
-                            ✅ Taken at {formatTime(takenAt!)}
-                          </div>
-                        ) : (
-                          <button
-                            onClick={() => handleTookIt(med)}
-                            disabled={isLoading}
-                            className="w-full bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-bold py-5 px-6 rounded-full text-xl transition-colors disabled:opacity-60 disabled:cursor-not-allowed shadow-md"
-                          >
-                            {isLoading ? '⏳ Logging…' : '✅ I TOOK IT'}
-                          </button>
-                        )}
+                        {/* One row per reminder time */}
+                        <div className="space-y-2">
+                          {times.map((reminderTime, tIdx) => {
+                            const slotKey = `${med.id}:${reminderTime}`
+                            const isLoading = loadingMed === slotKey
+                            const { isTaken, isSkipped, takenAt } = getSlotStatus(med, reminderTime)
+
+                            return (
+                              <div
+                                key={reminderTime}
+                                className={`rounded-xl p-3 border ${
+                                  isTaken
+                                    ? 'bg-emerald-50 border-emerald-200'
+                                    : isSkipped
+                                      ? 'bg-gray-50 border-gray-200'
+                                      : 'bg-white border-gray-100'
+                                }`}
+                              >
+                                {/* Time label */}
+                                <p className="text-base font-semibold text-gray-600 mb-2">
+                                  ⏰ {formatReminderTime(reminderTime)}
+                                  {times.length > 1 && (
+                                    <span className="ml-2 text-xs text-gray-400 font-normal">
+                                      Dose {tIdx + 1} of {times.length}
+                                    </span>
+                                  )}
+                                </p>
+
+                                {isTaken ? (
+                                  <div className="w-full bg-emerald-100 text-emerald-700 font-semibold py-3 px-4 rounded-full text-lg text-center">
+                                    ✅ Taken{takenAt ? ` at ${formatTime(takenAt)}` : ''}
+                                  </div>
+                                ) : isSkipped ? (
+                                  <div className="flex items-center gap-2">
+                                    <div className="flex-1 bg-gray-100 text-gray-500 font-semibold py-3 px-4 rounded-full text-lg text-center">
+                                      ⏭️ Skipped
+                                    </div>
+                                    <button
+                                      onClick={() => handleSlotAction(med, reminderTime, 'taken')}
+                                      disabled={!!loadingMed}
+                                      className="text-sm text-teal-600 hover:text-teal-700 font-medium underline whitespace-nowrap disabled:opacity-50"
+                                    >
+                                      Undo
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <div className="flex gap-2">
+                                    <button
+                                      onClick={() => handleSlotAction(med, reminderTime, 'taken')}
+                                      disabled={isLoading || !!loadingMed}
+                                      className="flex-1 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-bold py-4 px-4 rounded-full text-lg transition-colors disabled:opacity-60 disabled:cursor-not-allowed shadow-md"
+                                    >
+                                      {isLoading ? '⏳' : '✅ I TOOK IT'}
+                                    </button>
+                                    <button
+                                      onClick={() => handleSlotAction(med, reminderTime, 'skipped')}
+                                      disabled={isLoading || !!loadingMed}
+                                      className="px-4 py-4 border-2 border-gray-200 text-gray-500 font-semibold rounded-full text-lg hover:bg-gray-50 transition-colors disabled:opacity-60"
+                                      title="Skip this dose"
+                                    >
+                                      ⏭️
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            )
+                          })}
+                        </div>
 
                         {/* Change request button area — only show if caregiver oversees meds */}
                         {!patient.member_can_self_manage && (
