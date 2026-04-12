@@ -17,13 +17,19 @@ export default function InstallStep({ onDone }: Props) {
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null)
   const [installing, setInstalling] = useState(false)
 
+  const [isChrome, setIsChrome] = useState(false)
+  const [currentUrl, setCurrentUrl] = useState('')
+
   useEffect(() => {
     const ua = navigator.userAgent
     const ios = /iphone|ipad|ipod/i.test(ua) && !(window as typeof window & { MSStream?: unknown }).MSStream
     const android = /android/i.test(ua)
+    const chrome = /chrome/i.test(ua) && !/edg/i.test(ua)
 
     setIsIOS(!!ios)
     setIsAndroid(!!android)
+    setIsChrome(!!chrome)
+    setCurrentUrl(window.location.href)
 
     // Listen for beforeinstallprompt (Android/Chrome)
     const handler = (e: Event) => {
@@ -125,17 +131,33 @@ export default function InstallStep({ onDone }: Props) {
                 disabled={installing}
                 className="w-full py-5 bg-teal-600 hover:bg-teal-700 active:bg-teal-800 text-white rounded-2xl text-2xl font-bold transition-colors shadow-md flex items-center justify-center gap-3"
               >
-                {installing ? (
-                  <>⏳ Installing…</>
-                ) : (
-                  <>➕ Add to Home Screen</>
-                )}
+                {installing ? <>⏳ Installing…</> : <>➕ Add to Home Screen</>}
               </button>
+            ) : !isChrome ? (
+              <div className="bg-white rounded-3xl border border-teal-100 p-7 text-center">
+                <div className="text-5xl mb-4">🌐</div>
+                <h3 className="text-2xl font-bold text-gray-900 mb-3">Open in Chrome</h3>
+                <p className="text-xl text-gray-600 leading-relaxed mb-6">
+                  To add RxNudge to your home screen, you need to open this page in <strong>Chrome</strong>.
+                </p>
+                <a
+                  href={`intent://${currentUrl.replace(/^https?:\/\//, '')}#Intent;scheme=https;package=com.android.chrome;end`}
+                  className="block w-full py-5 bg-teal-600 hover:bg-teal-700 text-white rounded-2xl text-2xl font-bold transition-colors shadow-md text-center"
+                >
+                  🌐 Open in Chrome
+                </a>
+                <p className="text-gray-400 text-base mt-4">
+                  Don&apos;t have Chrome?{' '}
+                  <a href="https://play.google.com/store/apps/details?id=com.android.chrome" target="_blank" rel="noopener noreferrer" className="text-teal-600 underline">
+                    Download it free
+                  </a>
+                </p>
+              </div>
             ) : (
               <div className="bg-white rounded-3xl border border-teal-100 p-6 text-center">
                 <p className="text-xl text-gray-600 leading-relaxed">
-                  Open this page in <strong>Chrome</strong> on your Android phone,<br />
-                  then tap the menu (⋮) and choose <strong>&ldquo;Add to Home Screen&rdquo;</strong>.
+                  Tap the menu <strong>(⋮)</strong> at the top right,<br />
+                  then tap <strong>&ldquo;Add to Home Screen&rdquo;</strong>.
                 </p>
               </div>
             )}
