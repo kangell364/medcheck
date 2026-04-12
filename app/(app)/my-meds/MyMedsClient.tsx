@@ -249,13 +249,34 @@ interface NewMedRequestModalProps {
   onSubmitted: () => void
 }
 
+const FREQ_OPTIONS = [
+  { value: 'once', label: 'Once daily', times: ['08:00'] },
+  { value: 'twice', label: 'Twice daily', times: ['08:00', '20:00'] },
+  { value: 'three_times', label: '3 times daily', times: ['08:00', '13:00', '20:00'] },
+]
+
 function NewMedRequestModal({ patientId, caregiverFirstName, onClose, onSubmitted }: NewMedRequestModalProps) {
   const [reqName, setReqName] = useState('')
   const [reqDosage, setReqDosage] = useState('')
   const [reqNickname, setReqNickname] = useState('')
+  const [reqFrequency, setReqFrequency] = useState('once')
+  const [reqTimes, setReqTimes] = useState(['08:00'])
+  const [reqStartDate, setReqStartDate] = useState(new Date().toISOString().slice(0, 10))
   const [memberNote, setMemberNote] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+
+  function handleFrequencyChange(freq: string) {
+    setReqFrequency(freq)
+    const opt = FREQ_OPTIONS.find(o => o.value === freq)
+    if (opt) setReqTimes([...opt.times])
+  }
+
+  function updateTime(i: number, val: string) {
+    const updated = [...reqTimes]
+    updated[i] = val
+    setReqTimes(updated)
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -276,6 +297,9 @@ function NewMedRequestModal({ patientId, caregiverFirstName, onClose, onSubmitte
           requested_name: reqName,
           requested_dosage: reqDosage || undefined,
           requested_nickname: reqNickname || undefined,
+          requested_frequency: reqFrequency,
+          requested_reminder_times: reqTimes,
+          requested_start_date: reqStartDate,
           member_note: memberNote,
         }),
       })
@@ -351,6 +375,55 @@ function NewMedRequestModal({ patientId, caregiverFirstName, onClose, onSubmitte
                 className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-teal-500 text-lg"
                 placeholder="e.g. heart pill"
               />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
+              <input
+                type="date"
+                value={reqStartDate}
+                onChange={e => setReqStartDate(e.target.value)}
+                className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-teal-500 text-lg"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">How Often?</label>
+              <div className="grid grid-cols-3 gap-2">
+                {FREQ_OPTIONS.map(opt => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => handleFrequencyChange(opt.value)}
+                    className={`py-3 px-2 rounded-xl border-2 text-sm font-medium transition-colors ${
+                      reqFrequency === opt.value
+                        ? 'border-teal-500 bg-teal-50 text-teal-700'
+                        : 'border-gray-200 text-gray-600'
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Reminder Times</label>
+              <div className="space-y-2">
+                {reqTimes.map((t, i) => (
+                  <div key={i} className="flex items-center gap-3">
+                    <span className="text-sm text-gray-500 w-20">
+                      {i === 0 ? 'Morning' : i === 1 ? 'Evening' : 'Midday'}:
+                    </span>
+                    <input
+                      type="time"
+                      value={t}
+                      onChange={e => updateTime(i, e.target.value)}
+                      className="flex-1 px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-teal-500 text-lg"
+                    />
+                  </div>
+                ))}
+              </div>
             </div>
 
             <div>
