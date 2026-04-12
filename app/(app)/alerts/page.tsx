@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { Suspense } from 'react'
 import AlertFilters, { type AlertFilter } from '@/components/AlertFilters'
 import AlertRow from '@/components/AlertRow'
+import ChangeRequestCard from '@/components/ChangeRequestCard'
 import LoadMoreAlerts from '@/components/LoadMoreAlerts'
 
 const PAGE_SIZE = 50
@@ -17,6 +18,27 @@ const FILTER_EVENT_TYPES: Record<Exclude<AlertFilter, 'all'>, string[]> = {
   appointments: ['appointment_reminder', 'appointment_completed', 'appointment_missed'],
   account: ['med_added', 'med_deleted', 'med_edited', 'patient_updated', 'contact_added'],
   delivery: ['sms_failed', 'delivery_delayed', 'system_error'],
+  requests: [
+    'med_change_request', 'change_approved', 'change_declined',
+    'new_med_request', 'new_med_approved', 'new_med_declined',
+  ],
+}
+
+const CHANGE_REQUEST_EVENT_TYPES = new Set([
+  'med_change_request', 'new_med_request',
+  'change_approved', 'change_declined',
+  'new_med_approved', 'new_med_declined',
+])
+
+const SEVERITY_TEXT: Record<string, string> = {
+  missed_dose: 'text-red-700 font-bold text-lg',
+  med_change_request: 'text-amber-700 font-bold text-lg',
+  new_med_request: 'text-amber-700 font-bold text-lg',
+  change_approved: 'text-green-700 font-bold text-lg',
+  new_med_approved: 'text-green-700 font-bold text-lg',
+  change_declined: 'text-gray-600 font-medium',
+  new_med_declined: 'text-gray-600 font-medium',
+  enrollment: 'text-blue-600 font-medium',
 }
 
 interface PageProps {
@@ -64,19 +86,54 @@ export default async function AlertsPage({ searchParams }: PageProps) {
     .range(offset, offset + PAGE_SIZE - 1)
 
   if (filteredPatientIds.length === 0) {
-    // No patients — return empty
     return <EmptyState activeFilter={activeFilter} />
   }
 
   query = query.in('patient_id', filteredPatientIds)
 
-  // Apply filter
   if (activeFilter !== 'all') {
     const eventTypes = FILTER_EVENT_TYPES[activeFilter]
     query = query.in('event_type', eventTypes)
   }
 
   const { data: alertLogs } = await query
+
+  // For change request alerts, fetch the actual request data + original med in one batch
+  const changeRequestIds: string[] = []
+  for (const alert of alertLogs || []) {
+    const crId = (alert.internal_details as any)?.change_request_id
+    if (crId && CHANGE_REQUEST_EVENT_TYPES.has(alert.event_type)) {
+      changeRequestIds.push(crId)
+    }
+  }
+
+  // Fetch all change requests in one query
+  const changeRequestMap = new Map<string, any>()
+  if (changeRequestIds.length > 0) {
+    const { data: reqs } = await supabase
+      .from('med_change_requests')
+      .select('*')
+      .in('id', changeRequestIds)
+    for (const r of reqs || []) {
+      changeRequestMap.set(r.id, r)
+    }
+  }
+
+  // Fetch original medications for change requests
+  const medicationIds: string[] = []
+  for (const req of changeRequestMap.values()) {
+    if (req.medication_id) medicationIds.push(req.medication_id)
+  }
+  const originalMedMap = new Map<string, any>()
+  if (medicationIds.length > 0) {
+    const { data: meds } = await supabase
+      .from('medications')
+      .select('id, name, nickname, dosage, frequency, reminder_times, notes')
+      .in('id', medicationIds)
+    for (const m of meds || []) {
+      originalMedMap.set(m.id, m)
+    }
+  }
 
   return (
     <div className="max-w-3xl mx-auto pb-20 md:pb-0">
@@ -106,20 +163,47 @@ export default async function AlertsPage({ searchParams }: PageProps) {
       ) : (
         <>
           <div className="space-y-3">
-            {alertLogs.map((alert: any) => (
-              <AlertRow
-                key={alert.id}
-                id={alert.id}
-                patientName={alert.patient_name || (alert as any).patients?.name || null}
-                medicationName={alert.medication_name || null}
-                displayMessage={alert.display_message || alert.message}
-                message={alert.message}
-                severity={alert.severity}
-                sentAt={alert.sent_at}
-                internalDetails={alert.internal_details}
-                isAdmin={isAdmin}
-              />
-            ))}
+            {alertLogs.map((alert: any) => {
+              const isChangeEvent = CHANGE_REQUEST_EVENT_TYPES.has(alert.event_type)
+              const crId = (alert.internal_details as any)?.change_request_id
+
+              if (isChangeEvent && crId) {
+                const reqData = changeRequestMap.get(crId) || null
+                const originalMed = reqData?.medication_id ? originalMedMap.get(reqData.medication_id) || null : null
+
+                return (
+                  <ChangeRequestCard
+                    key={alert.id}
+                    alertId={alert.id}
+                    patientName={alert.patient_name || null}
+                    sentAt={alert.sent_at}
+                    internalDetails={alert.internal_details}
+                    eventType={alert.event_type}
+                    changeRequestId={crId}
+                    requestData={reqData}
+                    originalMed={originalMed}
+                  />
+                )
+              }
+
+              // Normal alert row — apply severity text style if known
+              const extraClass = SEVERITY_TEXT[alert.event_type] || ''
+              return (
+                <AlertRow
+                  key={alert.id}
+                  id={alert.id}
+                  patientName={alert.patient_name || null}
+                  medicationName={alert.medication_name || null}
+                  displayMessage={alert.display_message || alert.message}
+                  message={alert.message}
+                  severity={alert.severity}
+                  sentAt={alert.sent_at}
+                  internalDetails={alert.internal_details}
+                  isAdmin={isAdmin}
+                  severityClass={extraClass}
+                />
+              )
+            })}
           </div>
 
           <Suspense fallback={null}>

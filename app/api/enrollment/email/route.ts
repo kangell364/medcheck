@@ -66,7 +66,7 @@ export async function POST(request: NextRequest) {
     <h2 style="color: #111827;">Hi ${memberFirstName}!</h2>
     <p style="color: #374151; line-height: 1.6;">
       <strong>${caregiverName}</strong> has set up daily medication reminders for you using RxNudge.
-      RxNudge will remind you to take your medications each day.
+      RxNudge helps you track and log your medications each day — just a friendly check-in, nothing more.
     </p>
 
     <p style="color: #374151; line-height: 1.6;">

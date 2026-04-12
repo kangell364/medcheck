@@ -2,10 +2,11 @@
 
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 
-export type AlertFilter = 'all' | 'missed' | 'calls' | 'appointments' | 'account' | 'delivery'
+export type AlertFilter = 'all' | 'missed' | 'calls' | 'appointments' | 'account' | 'delivery' | 'requests'
 
 const FILTERS: { id: AlertFilter; label: string; emoji: string }[] = [
   { id: 'all', label: 'All', emoji: '🔔' },
+  { id: 'requests', label: 'Requests', emoji: '💬' },
   { id: 'missed', label: 'Missed Doses', emoji: '⚠️' },
   { id: 'calls', label: 'Calls', emoji: '📞' },
   { id: 'appointments', label: 'Appointments', emoji: '📅' },

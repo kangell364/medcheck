@@ -128,29 +128,29 @@ export function buildEscalationSmsTexts(
   const bullets = buildBulletList(meds)
 
   const sms1 =
-    `💊 Good morning ${firstName}! Did you take your ${tod} medications?\n\n` +
+    `💊 Hi ${firstName}! RxNudge here — just helping you log your ${tod} medications.\n\n` +
     `${bullets}\n\n` +
-    `Reply YES when done or NO if you haven't. Reply STOP to opt out.`
+    `Reply YES to log them as taken, or NO to skip. Reply STOP to opt out.`
 
   const sms2 =
-    `⏰ Reminder: Don't forget your ${tod} medications, ${firstName}!\n\n` +
+    `💊 Just a friendly check-in, ${firstName}! Ready to log your ${tod} medications?\n\n` +
     `${bullets}\n\n` +
-    `Reply YES when taken.`
+    `Reply YES to log them as taken.`
 
   const postSnoozeSms =
-    `No problem! We'll check back in a bit. 💊\n\n` +
+    `No worries! We'll check back in a bit. 💊\n\n` +
     `${bullets}`
 
   const finalSms =
-    `Last chance reminder for your ${tod} medications, ${firstName}.\n\n` +
+    `💊 Last check-in for your ${tod} medications, ${firstName}.\n\n` +
     `${bullets}\n\n` +
-    `Reply YES or we'll let ${caregiverName} know. 💊`
+    `Reply YES to log them as taken. Reply STOP to opt out.`
 
   const confirmedReply =
-    `✅ ${todLabel} medications marked as taken. Have a wonderful day, ${firstName}!`
+    `✅ ${todLabel} medications logged! Great job, ${firstName}. Have a wonderful day!`
 
   const noReply =
-    `No problem! We'll check back in a bit. 💊`
+    `Got it! We'll check back in a bit. 💊`
 
   return { sms1, sms2, postSnoozeSms, finalSms, confirmedReply, noReply }
 }

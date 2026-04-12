@@ -149,6 +149,27 @@ export interface ReminderEscalation {
   updated_at: string
 }
 
+// Medication change requests
+export interface MedChangeRequest {
+  id: string
+  patient_id: string
+  medication_id: string | null
+  requested_by: string | null
+  type: 'change' | 'new_medication'
+  status: 'pending' | 'approved' | 'declined'
+  requested_name: string | null
+  requested_dosage: string | null
+  requested_frequency: string | null
+  requested_reminder_times: string[] | null
+  requested_nickname: string | null
+  requested_notes: string | null
+  member_note: string | null
+  caregiver_note: string | null
+  responded_at: string | null
+  created_at: string
+  updated_at: string
+}
+
 // Affiliate / referral program types
 export interface Affiliate {
   id: string

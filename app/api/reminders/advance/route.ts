@@ -202,7 +202,7 @@ async function advanceEscalation(
         .update({ step: 4 })
         .eq('id', escalationId)
 
-      const sms3 = `Last chance — did you take your medications? Reply YES or we'll let ${caregiverName} know. 💊`
+      const sms3 = `💊 Last check-in for today, ${firstName}! Reply YES to log your medications as taken. Reply STOP to opt out.`
 
       try {
         const msg = await twilioClient.messages.create({
@@ -233,7 +233,7 @@ async function advanceEscalation(
       .update({ step: 5 })
       .eq('id', escalationId)
 
-    const sms4 = `Final check — did you take your medications? Reply YES to confirm.`
+    const sms4 = `💊 One last check-in, ${firstName}! Reply YES to log your medications as taken today.`
 
     try {
       const msg = await twilioClient.messages.create({

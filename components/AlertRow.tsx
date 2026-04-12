@@ -15,6 +15,8 @@ interface AlertRowProps {
   sentAt: string
   internalDetails?: Record<string, unknown> | null
   isAdmin: boolean
+  /** Optional override for message text styling (e.g. bold red for missed doses) */
+  severityClass?: string
 }
 
 const SEVERITY_CONFIG: Record<Severity, { border: string; icon: string; bg: string }> = {
@@ -33,6 +35,7 @@ export default function AlertRow({
   sentAt,
   internalDetails,
   isAdmin,
+  severityClass,
 }: AlertRowProps) {
   const [expanded, setExpanded] = useState(false)
   const sev: Severity = severity || 'info'
@@ -54,7 +57,7 @@ export default function AlertRow({
               </span>
             )}
           </div>
-          <p className="text-sm text-gray-700 mt-1">{shownMessage}</p>
+          <p className={`mt-1 ${severityClass || 'text-sm text-gray-700'}`}>{shownMessage}</p>
           <div className="flex items-center gap-3 mt-2">
             <span
               className="text-xs text-gray-400 cursor-default"
