@@ -132,7 +132,8 @@ async function startEscalationForPatient(
   const firstName = patient.name.split(' ')[0]
   const texts = buildEscalationSmsTexts(firstName, medsToRemind, tod, caregiverName)
 
-  // Create escalation
+  // Create escalation (CALL-ONLY mode)
+  // You mentioned SMS is not approved yet, but voice calls are.
   const { data: escalation, error: escError } = await supabase
     .from('reminder_escalations')
     .insert({
@@ -140,7 +141,7 @@ async function startEscalationForPatient(
       medication_ids: medIds,
       escalation_date: today,
       time_slot: matchingTime,
-      step: ESCALATION_STEPS.SMS1,
+      step: ESCALATION_STEPS.CALL,
       status: 'pending',
     })
     .select('id')
@@ -151,33 +152,45 @@ async function startEscalationForPatient(
     return { skipped: true, reason: 'db_error' }
   }
 
-  // Send SMS #1
+  // Immediately trigger AI reminder call
   try {
-    const msg = await twilioClient.messages.create({
-      to: patient.phone,
-      from: process.env.TWILIO_PHONE_NUMBER!,
-      body: texts.sms1,
+    const medList = medsToRemind.map((m: MedForSms) => ({
+      name: m.name,
+      nickname: m.nickname ?? null,
+      dosage: m.dosage ?? null,
+    }))
+
+    await fetch(`${process.env.NEXT_PUBLIC_APP_URL || ''}/api/calls/remind`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        escalationId: escalation.id,
+        patientName: patient.name,
+        patientPhone: patient.phone,
+        medList,
+      }),
     })
+
     await adminLogEvent({
       patientId: patient.id,
       ownerId: patient.owner_id,
-      eventType: 'sms_sent',
+      eventType: 'call_placed',
       patientName: patient.name,
-      internalDetails: { smsSid: msg.sid, escalationId: escalation.id, step: 1, timeSlot: matchingTime },
+      internalDetails: { escalationId: escalation.id, step: ESCALATION_STEPS.CALL, timeSlot: matchingTime, mode: 'call_only' },
     })
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err)
-    console.error('[reminders/start] SMS send failed:', msg)
+    console.error('[reminders/start] Call trigger failed:', msg)
     await adminLogEvent({
       patientId: patient.id,
       ownerId: patient.owner_id,
-      eventType: 'sms_failed',
+      eventType: 'call_failed',
       patientName: patient.name,
-      internalDetails: { error: msg, escalationId: escalation.id },
+      internalDetails: { error: msg, escalationId: escalation.id, mode: 'call_only' },
     })
   }
 
-  return { started: true, escalationId: escalation.id }
+  return { started: true, escalationId: escalation.id, mode: 'call_only' }
 }
 
 export async function POST(request: NextRequest) {

@@ -129,98 +129,47 @@ async function advanceEscalation(
     return { advanced: true }
   }
 
-  // ── STEP 1 → 2: send SMS #2 ───────────────────────────────────
-  if (status === 'pending' && step === 1) {
-    if (minutesAgo(createdAt) < 30) return { advanced: false, reason: 'too_soon' }
+  // CALL-ONLY mode: we skip SMS steps entirely.
+  // If an old escalation exists at step 1 or 2, advance it straight to CALL.
+  if (status === 'pending' && (step === 1 || step === 2)) {
+    // wait the usual 30 minutes since last touch before placing a call
+    const refTs = step === 1 ? createdAt : updatedAt
+    if (minutesAgo(refTs) < 30) return { advanced: false, reason: 'too_soon' }
 
     await supabase
       .from('reminder_escalations')
-      .update({ step: 2 })
+      .update({ step: 3 })
       .eq('id', escalationId)
 
     try {
-      const msg = await twilioClient.messages.create({
-        to: patient.phone as string,
-        from: process.env.TWILIO_PHONE_NUMBER!,
-        body: texts.sms2,
+      const medList = medsToUse.map((m: MedForSms) => ({
+        name: m.name,
+        nickname: m.nickname ?? null,
+        dosage: m.dosage ?? null,
+      }))
+
+      await fetch(`${appUrl}/api/calls/remind`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          escalationId,
+          patientName: patient.name as string,
+          patientPhone: patient.phone as string,
+          medList,
+        }),
       })
+
       await adminLogEvent({
         patientId: patient.id as string,
         ownerId: patient.owner_id as string,
-        eventType: 'sms_sent',
+        eventType: 'call_placed',
         patientName: patient.name as string,
-        internalDetails: { smsSid: msg.sid, escalationId, step: 2 },
+        internalDetails: { escalationId, step: 3, mode: 'call_only' },
       })
     } catch (e: unknown) {
-      console.error('[advance] SMS #2 failed:', e)
+      console.error('[advance] AI call trigger failed:', e)
     }
-    return { advanced: true }
-  }
 
-  // ── STEP 2 → 3 or 4 ───────────────────────────────────────────
-  if (status === 'pending' && step === 2) {
-    if (minutesAgo(updatedAt) < 30) return { advanced: false, reason: 'too_soon' }
-
-    if (contactMethod !== 'text') {
-      // Trigger AI call
-      await supabase
-        .from('reminder_escalations')
-        .update({ step: 3 })
-        .eq('id', escalationId)
-
-      try {
-        const medList = medsToUse.map((m: MedForSms) => ({
-          name: m.name,
-          nickname: m.nickname ?? null,
-          dosage: m.dosage ?? null,
-        }))
-
-        await fetch(`${appUrl}/api/calls/remind`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            escalationId,
-            patientName: patient.name as string,
-            patientPhone: patient.phone as string,
-            medList,
-          }),
-        })
-        await adminLogEvent({
-          patientId: patient.id as string,
-          ownerId: patient.owner_id as string,
-          eventType: 'call_placed',
-          patientName: patient.name as string,
-          internalDetails: { escalationId, step: 3 },
-        })
-      } catch (e: unknown) {
-        console.error('[advance] AI call trigger failed:', e)
-      }
-    } else {
-      // Text-only: send SMS #3
-      await supabase
-        .from('reminder_escalations')
-        .update({ step: 4 })
-        .eq('id', escalationId)
-
-      const sms3 = `💊 Last check-in for today, ${firstName}! Reply YES to log your medications as taken. Reply STOP to opt out.`
-
-      try {
-        const msg = await twilioClient.messages.create({
-          to: patient.phone as string,
-          from: process.env.TWILIO_PHONE_NUMBER!,
-          body: sms3,
-        })
-        await adminLogEvent({
-          patientId: patient.id as string,
-          ownerId: patient.owner_id as string,
-          eventType: 'sms_sent',
-          patientName: patient.name as string,
-          internalDetails: { smsSid: msg.sid, escalationId, step: 4 },
-        })
-      } catch (e: unknown) {
-        console.error('[advance] SMS #3 failed:', e)
-      }
-    }
     return { advanced: true }
   }
 
