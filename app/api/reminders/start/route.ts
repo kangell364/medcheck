@@ -53,7 +53,7 @@ async function startEscalationForPatient(
   twilioClient: ReturnType<typeof twilio>,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   patient: Record<string, any>
-): Promise<{ skipped?: boolean; reason?: string; started?: boolean; escalationId?: string }> {
+): Promise<{ skipped?: boolean; reason?: string; started?: boolean; escalationId?: string; mode?: string }> {
   if (!patient.active) return { skipped: true, reason: 'inactive' }
   if (patient.enrollment_status !== 'active') return { skipped: true, reason: 'not_enrolled' }
   if (patient.reminders_enabled === false) return { skipped: true, reason: 'reminders_disabled' }
