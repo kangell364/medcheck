@@ -23,6 +23,7 @@ export default function SettingsPage() {
   const [email, setEmail] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string>('')
+  const [notice, setNotice] = useState<string>('')
 
   useEffect(() => {
     async function load() {
@@ -44,6 +45,7 @@ export default function SettingsPage() {
   async function save() {
     setSaving(true)
     setError('')
+    setNotice('')
 
     const res = await fetch('/api/profile', {
       method: 'PATCH',
@@ -56,6 +58,10 @@ export default function SettingsPage() {
       setError(j?.error || 'Save failed')
       setSaving(false)
       return
+    }
+
+    if (j.emailUpdate === 'confirmation_sent') {
+      setNotice('We sent a confirmation link to your new email. Please verify to complete the change.')
     }
 
     if (j.profile) setProfile(j.profile)
@@ -106,6 +112,12 @@ export default function SettingsPage() {
             </div>
           )}
         </div>
+
+        {notice && (
+          <div className="bg-blue-50 border border-blue-200 text-blue-800 px-4 py-3 rounded-xl text-sm mb-4">
+            {notice}
+          </div>
+        )}
 
         {error && (
           <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm mb-4">
