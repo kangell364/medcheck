@@ -35,6 +35,7 @@ export async function PATCH(req: Request) {
   const body = (await req.json().catch(() => ({}))) as Record<string, unknown>
 
   const updates: Record<string, unknown> = {}
+  let newEmail: string | null = null
 
   if (typeof body.full_name === 'string') {
     updates.full_name = body.full_name.trim()
@@ -48,8 +49,25 @@ export async function PATCH(req: Request) {
     updates.phone = phone.length === 0 ? null : phone
   }
 
-  if (Object.keys(updates).length === 0) {
+  if (typeof body.email === 'string') {
+    const email = body.email.trim().toLowerCase()
+    if (email.length > 0) {
+      newEmail = email
+    }
+  }
+
+  if (Object.keys(updates).length === 0 && !newEmail) {
     return NextResponse.json({ error: 'no_valid_fields' }, { status: 400 })
+  }
+
+  if (newEmail && newEmail !== (user.email ?? '').toLowerCase()) {
+    const { error: emailError } = await supabase.auth.updateUser({ email: newEmail })
+    if (emailError) return NextResponse.json({ error: emailError.message }, { status: 400 })
+  }
+
+  if (Object.keys(updates).length === 0) {
+    // Email-only update
+    return NextResponse.json({ ok: true, emailUpdate: 'confirmation_sent' })
   }
 
   const { data, error } = await supabase

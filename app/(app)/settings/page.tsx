@@ -20,13 +20,16 @@ export default function SettingsPage() {
   const [editing, setEditing] = useState(false)
   const [fullName, setFullName] = useState('')
   const [phone, setPhone] = useState('')
+  const [email, setEmail] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string>('')
 
   useEffect(() => {
     async function load() {
       const { data: { user } } = await supabase.auth.getUser()
-      setUserEmail(user?.email ?? '')
+      const currentEmail = user?.email ?? ''
+      setUserEmail(currentEmail)
+      setEmail(currentEmail)
 
       const res = await fetch('/api/profile', { cache: 'no-store' })
       if (!res.ok) return
@@ -45,7 +48,7 @@ export default function SettingsPage() {
     const res = await fetch('/api/profile', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ full_name: fullName, phone }),
+      body: JSON.stringify({ full_name: fullName, phone, email }),
     })
 
     const j = await res.json().catch(() => ({}))
@@ -55,7 +58,7 @@ export default function SettingsPage() {
       return
     }
 
-    setProfile(j.profile)
+    if (j.profile) setProfile(j.profile)
     setEditing(false)
     setSaving(false)
   }
@@ -86,6 +89,7 @@ export default function SettingsPage() {
                   setError('')
                   setFullName(profile?.full_name ?? '')
                   setPhone(profile?.phone ?? '')
+                  setEmail(userEmail)
                 }}
                 className="text-sm font-semibold text-gray-600 hover:text-gray-800"
                 disabled={saving}
@@ -144,7 +148,18 @@ export default function SettingsPage() {
 
           <div className="flex items-center justify-between py-2 border-b border-gray-50">
             <dt className="text-sm text-gray-500">Email</dt>
-            <dd className="text-sm font-medium text-gray-900">{userEmail || '—'}</dd>
+            <dd className="text-sm font-medium text-gray-900">
+              {!editing ? (
+                userEmail || '—'
+              ) : (
+                <input
+                  value={email}
+                  onChange={e => setEmail(e.target.value)}
+                  className="w-56 px-3 py-2 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-teal-500"
+                  placeholder="you@example.com"
+                />
+              )}
+            </dd>
           </div>
 
           <div className="flex items-center justify-between py-2 border-b border-gray-50">
