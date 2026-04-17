@@ -20,19 +20,19 @@ const tabs: Tab[] = [
   {
     href: '/patients',
     label: 'Members',
-    icon: '👤',
+    icon: '👥',
     match: (p) => p === '/patients' || p.startsWith('/patients/'),
   },
   {
     href: '/appointments',
     label: 'Appointments',
-    icon: '📆',
+    icon: '📅',
     match: (p) => p === '/appointments' || p.startsWith('/appointments/'),
   },
   {
     href: '/history',
     label: 'History',
-    icon: '📅',
+    icon: '🗓️',
     match: (p) => p === '/history' || p.startsWith('/history/'),
   },
 ]
