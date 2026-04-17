@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { Patient, Medication, DoseLog } from '@/lib/types'
 import DashboardGreeting from '@/components/DashboardGreeting'
 import DashboardRealtimeSync from '@/components/DashboardRealtimeSync'
+import AppTabs from '@/components/AppTabs'
 
 function formatApptDateTime(dateStr: string, timeStr: string): string {
   const dt = new Date(`${dateStr}T${timeStr}`)
@@ -138,6 +139,9 @@ export default async function DashboardPage() {
         userId={user!.id}
         patients={(patients || []).map(p => ({ id: p.id, name: p.name, enrollment_status: p.enrollment_status }))}
       />
+
+      {/* Top nav tabs (hide current section) */}
+      <AppTabs />
 
       {/* No patients yet */}
       {(!patients || patients.length === 0) && (

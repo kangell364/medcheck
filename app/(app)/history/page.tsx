@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { Patient, Medication, DoseLog } from '@/lib/types'
 import ReportModal from '@/components/ReportModal'
+import AppTabs from '@/components/AppTabs'
 
 function formatTime(time: string): string {
   const [hourStr, minute] = time.split(':')
@@ -124,6 +125,8 @@ export default async function HistoryPage() {
 
   return (
     <div className="max-w-4xl mx-auto pb-20 md:pb-0">
+      <AppTabs />
+
       <div className="mb-8 flex items-start justify-between">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Adherence History</h1>
