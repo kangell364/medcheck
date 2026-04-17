@@ -100,9 +100,15 @@ export default function TriggerCallButton({ patientId, patientName, medications,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ patientId }),
       })
-      const data = await res.json()
+      const data = await res.json().catch(() => ({}))
       if (res.ok) {
-        setMessage(`📞 Calling ${patientName}…`)
+        if (data?.skipped) {
+          setMessage(`Skipped: ${data.reason || 'unknown'}`)
+        } else if (data?.callSid) {
+          setMessage(`📞 Calling ${patientName}… (sid ${data.callSid})`)
+        } else {
+          setMessage(`📞 Calling ${patientName}…`)
+        }
       } else {
         setMessage(`Error: ${data.error || 'Failed to start call'}`)
       }
@@ -163,8 +169,14 @@ export default function TriggerCallButton({ patientId, patientName, medications,
                       headers: { 'Content-Type': 'application/json' },
                       body: JSON.stringify({ patientId }),
                     })
-                    const data = await res.json()
-                    setMessage(res.ok ? `📞 Calling ${patientName}…` : `Error: ${data.error}`)
+                    const data = await res.json().catch(() => ({}))
+                    if (res.ok) {
+                      if (data?.skipped) setMessage(`Skipped: ${data.reason || 'unknown'}`)
+                      else if (data?.callSid) setMessage(`📞 Calling ${patientName}… (sid ${data.callSid})`)
+                      else setMessage(`📞 Calling ${patientName}…`)
+                    } else {
+                      setMessage(`Error: ${data.error || 'Failed to start call'}`)
+                    }
                   } catch {
                     setMessage('Network error.')
                   }
