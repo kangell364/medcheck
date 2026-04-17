@@ -83,7 +83,10 @@ export async function POST(request: NextRequest) {
   }
 
   // Interpret with GPT-4o-mini
-  let intent: 'YES' | 'NO' | 'UNCERTAIN' = 'UNCERTAIN'
+  // We support: YES / NO / CALL_LATER / REPEAT / WHY_CALLING / UNCERTAIN
+  type Intent = 'YES' | 'NO' | 'CALL_LATER' | 'REPEAT' | 'WHY_CALLING' | 'UNCERTAIN'
+  let intent: Intent = 'UNCERTAIN'
+
   if (transcript) {
     try {
       const gptResponse = await fetch('https://openrouter.ai/api/v1/chat/completions', {
@@ -98,19 +101,19 @@ export async function POST(request: NextRequest) {
             {
               role: 'system',
               content:
-                'You are interpreting a patient response to the question: did you take your medication? Reply with exactly one word: YES, NO, or UNCERTAIN.',
+                "You are classifying a patient's spoken reply during an RxNudge medication reminder call. Reply with exactly ONE token from: YES, NO, CALL_LATER, REPEAT, WHY_CALLING, UNCERTAIN.\n\nGuidance:\n- YES: they took it (yep, yes, already did, I took it, done).\n- NO: they did not take it.\n- CALL_LATER: ask to call back later / not now / busy / call me in an hour.\n- REPEAT: what did you say / say again / repeat.\n- WHY_CALLING: why are you calling / who is this.\n- UNCERTAIN: anything else.",
             },
             { role: 'user', content: transcript },
           ],
-          max_tokens: 5,
+          max_tokens: 8,
         }),
       })
 
       if (gptResponse.ok) {
         const gptData = await gptResponse.json()
         const raw = (gptData.choices?.[0]?.message?.content || '').trim().toUpperCase()
-        if (raw === 'YES' || raw === 'NO' || raw === 'UNCERTAIN') {
-          intent = raw as 'YES' | 'NO' | 'UNCERTAIN'
+        if (['YES', 'NO', 'CALL_LATER', 'REPEAT', 'WHY_CALLING', 'UNCERTAIN'].includes(raw)) {
+          intent = raw as Intent
         }
       }
     } catch (err) {
@@ -158,7 +161,62 @@ export async function POST(request: NextRequest) {
   const tzOffsetMs = utcMidnight.getTime() - new Date(utcMidnight.toLocaleString('en-US', { timeZone: patientTimezone })).getTime()
   const scheduledAt = new Date(utcMidnight.getTime() + tzOffsetMs)
 
-  if (intent === 'YES') {
+  if (intent === 'CALL_LATER') {
+    // Always schedule callback in 1 hour, do NOT mark missed.
+    const scheduledFor = new Date(Date.now() + 60 * 60 * 1000)
+    await supabase.from('callbacks').insert({
+      patient_id: patientId,
+      medication_id: currentMed?.id || null,
+      scheduled_for: scheduledFor.toISOString(),
+    })
+
+    if (patient) {
+      await adminLogEvent({
+        patientId,
+        ownerId: patient.owner_id,
+        eventType: 'callback_scheduled',
+        patientName: patient.name,
+        medicationId: currentMed?.id,
+        medicationName: currentMed?.name,
+        internalDetails: { callSid, transcript, scheduledFor: scheduledFor.toISOString(), reason: 'call_later' },
+      })
+    }
+
+    const firstName = patient?.name?.split(' ')[0] || 'there'
+    twiml.say({ voice: 'Polly.Joanna' }, `No problem, ${firstName}. I'll call you back in one hour. Goodbye!`)
+    twiml.hangup()
+  } else if (intent === 'REPEAT') {
+    const medText = currentMed ? ((currentMed as any).nickname || currentMed.name) : 'your medication'
+    twiml.say({ voice: 'Polly.Joanna' }, `Sure. Did you take your ${medText}?`)
+    const transcribeUrl = `${APP_URL}/api/twilio/transcribe?patientId=${patientId}&medIndex=${medIndex}`
+    twiml.record({
+      maxLength: 5,
+      action: transcribeUrl,
+      method: 'POST',
+      playBeep: true,
+      timeout: 5,
+    })
+    twiml.say({ voice: 'Polly.Joanna' }, `Sorry, I didn't catch that. Moving on.`)
+    const nextUrl = `${APP_URL}/api/twilio/voice?patientId=${patientId}&medIndex=${medIndex + 1}`
+    twiml.redirect({ method: 'POST' }, nextUrl)
+  } else if (intent === 'WHY_CALLING') {
+    const firstName = patient?.name?.split(' ')[0] || 'there'
+    const medText = currentMed ? ((currentMed as any).nickname || currentMed.name) : 'your medication'
+    twiml.say({ voice: 'Polly.Joanna' }, `Hi ${firstName}. I'm Polly, your AI assistant from RxNudge. I'm calling to check on your medication reminder.`)
+    twiml.pause({ length: 1 })
+    twiml.say({ voice: 'Polly.Joanna' }, `Did you take your ${medText}?`)
+    const transcribeUrl = `${APP_URL}/api/twilio/transcribe?patientId=${patientId}&medIndex=${medIndex}`
+    twiml.record({
+      maxLength: 5,
+      action: transcribeUrl,
+      method: 'POST',
+      playBeep: true,
+      timeout: 5,
+    })
+    twiml.say({ voice: 'Polly.Joanna' }, `Sorry, I didn't catch that. Moving on.`)
+    const nextUrl = `${APP_URL}/api/twilio/voice?patientId=${patientId}&medIndex=${medIndex + 1}`
+    twiml.redirect({ method: 'POST' }, nextUrl)
+  } else if (intent === 'YES') {
     if (currentMed) {
       await supabase.from('dose_logs').upsert(
         {
