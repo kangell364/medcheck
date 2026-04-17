@@ -24,12 +24,6 @@ const tabs: Tab[] = [
     match: (p) => p === '/patients' || p.startsWith('/patients/'),
   },
   {
-    href: '/appointments',
-    label: 'Appointments',
-    icon: '📅',
-    match: (p) => p === '/appointments' || p.startsWith('/appointments/'),
-  },
-  {
     href: '/alerts',
     label: 'Alerts',
     icon: '🔔',

@@ -92,8 +92,8 @@ export default function NewAppointmentPage() {
   return (
     <div className="max-w-xl mx-auto pb-20 md:pb-0">
       <div className="mb-6">
-        <Link href="/appointments" className="text-sm text-teal-600 hover:underline mb-4 inline-block">
-          ← Back to Appointments
+        <Link href="/patients" className="text-sm text-teal-600 hover:underline mb-4 inline-block">
+          ← Back to Members
         </Link>
         <h1 className="text-3xl font-bold text-gray-900">Add Appointment</h1>
         <p className="text-gray-500 mt-1">Schedule a new appointment for a patient.</p>
@@ -230,7 +230,7 @@ export default function NewAppointmentPage() {
             {loading ? 'Saving...' : 'Save Appointment'}
           </button>
           <Link
-            href="/appointments"
+            href="/patients"
             className="flex-1 text-center bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold py-3 rounded-xl text-sm transition-colors"
           >
             Cancel

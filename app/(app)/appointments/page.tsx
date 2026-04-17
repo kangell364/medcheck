@@ -26,7 +26,12 @@ const statusConfig: Record<string, { label: string; class: string }> = {
   cancelled: { label: 'Cancelled', class: 'bg-gray-100 text-gray-600 border-gray-200' },
 }
 
+import { redirect } from 'next/navigation'
+
 export default async function AppointmentsPage() {
+  // Global appointments view removed — appointments live under each member only.
+  redirect('/patients')
+
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 

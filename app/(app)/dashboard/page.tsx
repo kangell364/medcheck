@@ -241,7 +241,6 @@ export default async function DashboardPage() {
         <div className="mt-8">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-semibold text-gray-900">Upcoming Appointments</h2>
-            <Link href="/appointments" className="text-sm text-teal-600 hover:underline">View all</Link>
           </div>
           <div className="bg-white rounded-2xl border border-gray-100 divide-y divide-gray-100">
             {upcomingAppointments.map((appt: any) => (
