@@ -35,6 +35,12 @@ const tabs: Tab[] = [
     icon: '🗓️',
     match: (p) => p === '/history' || p.startsWith('/history/'),
   },
+  {
+    href: '/alerts',
+    label: 'Alerts',
+    icon: '🔔',
+    match: (p) => p === '/alerts' || p.startsWith('/alerts/'),
+  },
 ]
 
 export default function AppTabs({ className = '' }: { className?: string }) {

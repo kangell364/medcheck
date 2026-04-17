@@ -158,7 +158,6 @@ export default async function DashboardPage() {
         <div className="grid gap-6 md:grid-cols-2">
           {patientData.map(({ patient, totalDoses, confirmedDoses, missedDoses, medRows }) => {
             const pct = totalDoses > 0 ? Math.round((confirmedDoses / totalDoses) * 100) : 0
-            const statusColor = pct === 100 ? 'text-emerald-600' : missedDoses > 0 ? 'text-red-500' : 'text-amber-500'
             const statusBg = pct === 100 ? 'bg-emerald-50 border-emerald-200' : missedDoses > 0 ? 'bg-red-50 border-red-200' : 'bg-amber-50 border-amber-200'
             const initial = patient.name.charAt(0).toUpperCase()
 
@@ -174,10 +173,6 @@ export default async function DashboardPage() {
                       <h3 className="text-xl font-bold text-gray-900">{patient.name}</h3>
                       <p className="text-sm text-gray-500">{patient.phone}</p>
                     </div>
-                  </div>
-                  <div className="text-right">
-                    <span className={`text-2xl font-bold ${statusColor}`}>{pct}%</span>
-                    <p className="text-xs text-gray-400">today</p>
                   </div>
                 </div>
 
@@ -240,29 +235,6 @@ export default async function DashboardPage() {
         </div>
       )}
 
-      {/* Quick actions */}
-      {patients && patients.length > 0 && (
-        <div className="mt-8 flex flex-wrap gap-3">
-          <Link
-            href="/patients/new"
-            className="bg-white hover:bg-gray-50 border border-gray-200 text-gray-700 font-medium py-3 px-6 rounded-xl text-sm transition-colors flex items-center gap-2"
-          >
-            <span>➕</span> Add Member
-          </Link>
-          <Link
-            href="/history"
-            className="bg-white hover:bg-gray-50 border border-gray-200 text-gray-700 font-medium py-3 px-6 rounded-xl text-sm transition-colors flex items-center gap-2"
-          >
-            <span>📅</span> View History
-          </Link>
-          <Link
-            href="/alerts"
-            className="bg-white hover:bg-gray-50 border border-gray-200 text-gray-700 font-medium py-3 px-6 rounded-xl text-sm transition-colors flex items-center gap-2"
-          >
-            <span>🔔</span> Alert Log
-          </Link>
-        </div>
-      )}
 
       {/* Upcoming Appointments */}
       {upcomingAppointments && upcomingAppointments.length > 0 && (
