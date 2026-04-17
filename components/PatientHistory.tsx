@@ -361,16 +361,46 @@ export default function PatientHistory({
 
       {/* Calendar month view */}
       {!loading && medications.length > 0 && (
-        <PatientHistoryCalendar
-          timezone={timezone}
-          start={start}
-          end={end}
-          visibleMonth={visibleMonth}
-          setVisibleMonth={setVisibleMonth}
-          medications={medications}
-          doseLogs={doseLogs}
-          slotMap={slotMap}
-        />
+        dateRange === '60d' ? (
+          <div className="grid gap-4 md:grid-cols-2">
+            <PatientHistoryCalendar
+              timezone={timezone}
+              start={start}
+              end={end}
+              visibleMonth={visibleMonth}
+              setVisibleMonth={setVisibleMonth}
+              medications={medications}
+              doseLogs={doseLogs}
+              slotMap={slotMap}
+            />
+            <PatientHistoryCalendar
+              timezone={timezone}
+              start={start}
+              end={end}
+              visibleMonth={(() => {
+                const [y, m] = visibleMonth.split('-').map(Number)
+                const d = new Date(y, (m || 1) - 1, 1)
+                d.setMonth(d.getMonth() + 1)
+                return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+              })()}
+              setVisibleMonth={setVisibleMonth}
+              medications={medications}
+              doseLogs={doseLogs}
+              slotMap={slotMap}
+            />
+          </div>
+        ) : (
+          <PatientHistoryCalendar
+            timezone={timezone}
+            start={start}
+            end={end}
+            visibleMonth={visibleMonth}
+            setVisibleMonth={setVisibleMonth}
+            medications={medications}
+            doseLogs={doseLogs}
+            slotMap={slotMap}
+          />
+        )
       )}
     </div>
   )
