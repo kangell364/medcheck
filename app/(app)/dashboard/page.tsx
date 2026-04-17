@@ -76,35 +76,7 @@ export default async function DashboardPage() {
       const allLogs = logs || []
       const confirmedIds = new Set(allLogs.filter(l => l.confirmed === true).map(l => l.medication_id))
 
-      const periods = ['morning', 'afternoon', 'evening'] as const
-      const periodStatus = periods.map(period => {
-        const periodMeds = allMeds.filter(m => getMedPeriod(m) === period)
-        if (periodMeds.length === 0) return null
-        const done = periodMeds.filter(m => confirmedIds.has(m.id)).length
-        return { period, done, total: periodMeds.length }
-      }).filter(Boolean)
-
-      // Last active (last confirmed log)
-      const lastLog = allLogs
-        .filter(l => l.confirmed === true && l.confirmed_at)
-        .sort((a, b) => new Date(b.confirmed_at!).getTime() - new Date(a.confirmed_at!).getTime())[0]
-
-      // Monthly adherence
-      const monthStart = new Date(today)
-      monthStart.setDate(1)
-      monthStart.setHours(0, 0, 0, 0)
-
-      const { data: monthLogs } = await supabase
-        .from('dose_logs')
-        .select('confirmed')
-        .eq('patient_id', patient.id)
-        .gte('scheduled_at', monthStart.toISOString())
-        .lt('scheduled_at', tomorrow.toISOString()) as { data: { confirmed: boolean | null }[] | null }
-
-      const monthTotal = (monthLogs || []).length
-      const monthConfirmed = (monthLogs || []).filter(l => l.confirmed === true).length
-      const monthPct = monthTotal > 0 ? Math.round((monthConfirmed / monthTotal) * 100) : null
-
+      // (Removed) time-of-day / monthly / last-active summary: keeping dashboard focused on today + per-med
       // Total scheduled doses today = sum of reminder time slots (default 1 per med)
       const scheduledSlots = allMeds.reduce((sum, m) => sum + ((m.reminder_times?.length || 0) > 0 ? m.reminder_times.length : 1), 0)
 
@@ -126,7 +98,7 @@ export default async function DashboardPage() {
           return { id: m.id, name: (m.nickname || m.name) as string, slots, confirmed, missed }
         })
 
-      return { patient, meds: allMeds, logs: allLogs, totalDoses: scheduledSlots, confirmedDoses, missedDoses, periodStatus, lastLog, monthPct, medRows }
+      return { patient, meds: allMeds, logs: allLogs, totalDoses: scheduledSlots, confirmedDoses, missedDoses, medRows }
     })
   )
 
@@ -182,13 +154,11 @@ export default async function DashboardPage() {
       {/* Patient cards */}
       {patientData.length > 0 && (
         <div className="grid gap-6 md:grid-cols-2">
-          {patientData.map(({ patient, totalDoses, confirmedDoses, missedDoses, periodStatus, lastLog, monthPct, medRows }) => {
+          {patientData.map(({ patient, totalDoses, confirmedDoses, missedDoses, medRows }) => {
             const pct = totalDoses > 0 ? Math.round((confirmedDoses / totalDoses) * 100) : 0
             const statusColor = pct === 100 ? 'text-emerald-600' : missedDoses > 0 ? 'text-red-500' : 'text-amber-500'
             const statusBg = pct === 100 ? 'bg-emerald-50 border-emerald-200' : missedDoses > 0 ? 'bg-red-50 border-red-200' : 'bg-amber-50 border-amber-200'
             const initial = patient.name.charAt(0).toUpperCase()
-
-            const periodIcons: Record<string, string> = { morning: '🌅', afternoon: '🌆', evening: '🌙' }
 
             return (
               <div key={patient.id} className={`bg-white rounded-2xl border-2 p-6 ${statusBg}`}>
@@ -209,43 +179,6 @@ export default async function DashboardPage() {
                   </div>
                 </div>
 
-                {/* Time-of-day status */}
-                {periodStatus && periodStatus.length > 0 && (
-                  <div className="flex flex-wrap gap-1.5 mb-3">
-                    {periodStatus.map(ps => {
-                      if (!ps) return null
-                      const isDone = ps.done === ps.total
-                      const isPast = ps.period === 'morning' && currentPeriod !== 'morning' ||
-                                     ps.period === 'afternoon' && currentPeriod === 'evening'
-                      return (
-                        <span
-                          key={ps.period}
-                          className={`text-xs px-2 py-1 rounded-full font-medium ${
-                            isDone
-                              ? 'bg-emerald-100 text-emerald-700'
-                              : isPast
-                              ? 'bg-red-100 text-red-700'
-                              : 'bg-amber-100 text-amber-700'
-                          }`}
-                        >
-                          {periodIcons[ps.period]} {isDone ? `${ps.period} done` : `${ps.done}/${ps.total} ${ps.period}`}
-                        </span>
-                      )
-                    })}
-                  </div>
-                )}
-
-                {/* Monthly adherence + last active */}
-                <div className="flex items-center justify-between text-xs text-gray-500 mb-3">
-                  {monthPct !== null && (
-                    <span>📅 {monthPct}% this month</span>
-                  )}
-                  {lastLog?.confirmed_at && (
-                    <span>
-                      Last: {new Date(lastLog.confirmed_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
-                    </span>
-                  )}
-                </div>
 
                 <div className="mb-3">
                   <div className="flex justify-between text-sm text-gray-600 mb-1">

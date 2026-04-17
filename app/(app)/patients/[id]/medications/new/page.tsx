@@ -151,7 +151,8 @@ export default function NewMedicationPage() {
       setError(error.message)
       setLoading(false)
     } else {
-      router.push(`/patients/${patientId}`)
+      // Force refresh of server components / cached patient data
+      router.push(`/patients/${patientId}?t=${Date.now()}`)
     }
   }
 

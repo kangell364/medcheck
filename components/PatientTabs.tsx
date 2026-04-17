@@ -128,6 +128,17 @@ export default function PatientTabs({
   // snoozeMap tracks optimistic snooze_until per medication ID after user clicks Snooze
   const [snoozeMap, setSnoozeMap] = useState<Record<string, string>>({})
 
+  // If we were deep-linked from the dashboard to log a specific medication,
+  // auto-scroll it into view.
+  useEffect(() => {
+    const medId = searchParams.get('med')
+    if (!medId) return
+    // wait for render
+    setTimeout(() => {
+      document.getElementById(`med-${medId}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }, 50)
+  }, [searchParams])
+
   const toggleMemberControl = useCallback(async () => {
     setTogglingControl(true)
     const newVal = !selfManage
@@ -356,7 +367,7 @@ export default function PatientTabs({
                   const overallConfig = statusConfig[overallStatus] || statusConfig.pending
 
                   return (
-                    <div key={med.id} className={`bg-white rounded-2xl border-2 p-5 ${overallConfig.class}`}>
+                    <div id={`med-${med.id}`} key={med.id} className={`bg-white rounded-2xl border-2 p-5 ${overallConfig.class} scroll-mt-24`}>
                       <div className="flex items-start justify-between mb-3">
                         <div className="flex items-start gap-3">
                           <span className="text-2xl mt-0.5">{overallConfig.icon}</span>

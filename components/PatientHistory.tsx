@@ -178,6 +178,19 @@ export default function PatientHistory({
   const dayDateStrs = days.map(d => dateStrInTz(d, timezone))
   const todayStr = todayLocalStr()
 
+  // Calendar month paging (month view)
+  function monthKey(d: Date): string {
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+  }
+
+  const [visibleMonth, setVisibleMonth] = useState<string>(() => monthKey(end))
+
+  // Keep visible month within the selected range
+  useEffect(() => {
+    const endKey = monthKey(end)
+    if (visibleMonth > endKey) setVisibleMonth(endKey)
+  }, [end, visibleMonth])
+
   // Build slot map: slotMap[medId][reminderTime][dateStr] = DoseLog
   const slotMap: Record<string, Record<string, Record<string, DoseLog>>> = {}
   for (const med of medications) {
@@ -345,7 +358,7 @@ export default function PatientHistory({
         </div>
       )}
 
-      {/* Grid */}
+      {/* Calendar month view */}
       {!loading && medications.length > 0 && (
         <>
           {/* Legend */}
@@ -394,7 +407,7 @@ export default function PatientHistory({
               {/* One grouped block per medication */}
               {medications.map((med, medIdx) => {
                 const isInactive = !med.active
-                const displayName = (med as any).nickname || med.name
+                const displayName = med.name
                 const times = med.reminder_times.length > 0 ? med.reminder_times : ['00:00']
 
                 const logsForThisMed = doseLogs.filter(l => l.medication_id === med.id)
@@ -443,10 +456,7 @@ export default function PatientHistory({
                                 <p className={`text-sm font-semibold truncate leading-tight ${isInactive ? 'line-through text-gray-400' : 'text-gray-800'}`}>
                                   {headingName}
                                 </p>
-                                {(med as any).nickname && !isInactive && (
-                                  <p className="text-xs text-gray-400 truncate">{med.name}</p>
-                                )}
-                                <div className="flex items-center gap-2 mt-0.5">
+                                                <div className="flex items-center gap-2 mt-0.5">
                                   {isInactive ? (
                                     <span className="text-xs text-gray-400 font-medium">archived</span>
                                   ) : (
