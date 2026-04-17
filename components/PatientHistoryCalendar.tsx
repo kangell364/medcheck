@@ -1,7 +1,6 @@
 'use client'
 
 import { useMemo } from 'react'
-import Link from 'next/link'
 import type { Medication, DoseLog } from '@/lib/types'
 
 function dateStrInTz(date: Date, timezone: string): string {
@@ -140,7 +139,7 @@ export default function PatientHistoryCalendar({
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-3">
+      <div className="flex items-center justify-between mb-4">
         <button
           type="button"
           disabled={!canPrev}
@@ -160,13 +159,13 @@ export default function PatientHistoryCalendar({
         </button>
       </div>
 
-      <div className="grid grid-cols-7 gap-2 text-[11px] text-gray-500 mb-2">
+      <div className="grid grid-cols-7 gap-1 text-[11px] text-gray-600 mb-1">
         {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d => (
           <div key={d} className="text-center">{d}</div>
         ))}
       </div>
 
-      <div className="grid grid-cols-7 gap-2">
+      <div className="grid grid-cols-7 gap-1">
         {weeks.flat().map((day, idx) => {
           const inMonth = day.getMonth() === monthStart.getMonth()
           const inRange = dayInRange(day)
@@ -176,24 +175,18 @@ export default function PatientHistoryCalendar({
           return (
             <div
               key={`${idx}-${dateStr}`}
-              className={`min-h-[86px] rounded-xl border p-2 ${
-                !inMonth ? 'bg-gray-50 border-gray-100 text-gray-300' : !inRange ? 'bg-white border-gray-100 opacity-60' : 'bg-white border-gray-200'
+              className={`min-h-[110px] md:min-h-[140px] rounded-none border p-2 ${
+                !inMonth ? 'bg-gray-50 border-gray-200 text-gray-300' : !inRange ? 'bg-white border-gray-200 opacity-60' : 'bg-white border-gray-300'
               }`}
             >
-              <div className="flex items-center justify-between mb-1">
-                <span className={`text-xs font-semibold ${inMonth ? 'text-gray-800' : 'text-gray-300'}`}>{day.getDate()}</span>
-                {inRange && (
-                  <Link href={`#day-${dateStr}`} className="text-[10px] text-teal-600 hover:underline">details</Link>
-                )}
-              </div>
+              <div className="text-[12px] font-semibold text-gray-700">{day.getDate()}</div>
 
-              <div className="space-y-1">
-                {lines.length === 0 && inRange && <div className="text-[10px] text-gray-300">—</div>}
+              <div className="mt-1 space-y-1">
                 {lines.map((l, i) => (
                   <div
                     key={i}
                     className={`text-[10px] leading-tight ${
-                      l.kind === 'taken' ? 'text-emerald-700' : l.kind === 'missed' ? 'text-red-700' : 'text-gray-500'
+                      l.kind === 'taken' ? 'text-gray-900' : l.kind === 'missed' ? 'text-gray-900' : 'text-gray-500'
                     }`}
                     title={l.text}
                   >
