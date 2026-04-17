@@ -13,7 +13,7 @@ interface PatientHistoryProps {
   patientTimezone: string
 }
 
-type DateRangeOption = '7d' | '14d' | '30d' | 'custom'
+type DateRangeOption = '30d' | '60d' | 'custom'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -74,9 +74,8 @@ function getDateRange(
   end.setHours(23, 59, 59, 999)
   let start = new Date()
 
-  if (range === '7d') start.setDate(start.getDate() - 6)
-  else if (range === '14d') start.setDate(start.getDate() - 13)
-  else if (range === '30d') start.setDate(start.getDate() - 29)
+  if (range === '30d') start.setDate(start.getDate() - 29)
+  else if (range === '60d') start.setDate(start.getDate() - 59)
   else if (range === 'custom' && customStart && customEnd) {
     return {
       start: new Date(customStart),
@@ -89,9 +88,8 @@ function getDateRange(
 }
 
 function getRangeLabel(range: DateRangeOption): string {
-  if (range === '7d') return 'Last 7 days — per medication breakdown'
-  if (range === '14d') return 'Last 2 weeks — per medication breakdown'
   if (range === '30d') return 'Last 30 days — per medication breakdown'
+  if (range === '60d') return 'Last 60 days — per medication breakdown'
   return 'Custom date range — per medication breakdown'
 }
 
@@ -246,9 +244,8 @@ export default function PatientHistory({
   // ─── UI ───────────────────────────────────────────────────────────────────
 
   const rangeButtons: { key: DateRangeOption; label: string }[] = [
-    { key: '7d', label: '7 Day' },
-    { key: '14d', label: '2 Weeks' },
     { key: '30d', label: '30 Days' },
+    { key: '60d', label: '60 Days' },
     { key: 'custom', label: 'Custom' },
   ]
 
