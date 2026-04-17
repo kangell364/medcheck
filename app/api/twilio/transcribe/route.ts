@@ -289,69 +289,83 @@ export async function POST(request: NextRequest) {
     twiml.say({ voice: 'Polly.Joanna' }, 'Okay, take care. Goodbye!')
     twiml.hangup()
   } else {
-    // UNCERTAIN — log with null confirmed, notify family
-    if (currentMed) {
-      await supabase.from('dose_logs').upsert(
-        {
-          patient_id: patientId,
-          medication_id: currentMed.id,
-          medication_name: currentMed.name,
-          scheduled_at: scheduledAt.toISOString(),
-          confirmed: null,
-          confirmed_at: new Date().toISOString(),
-          method: 'ai_call',
-          call_sid: callSid,
+    // UNCERTAIN — brief conversational response + steer back.
+    // Do NOT mark missed immediately. If still not confirmed, schedule a 1-hour callback.
+
+    const firstName = patient?.name?.split(' ')[0] || 'there'
+    const medText = currentMed ? ((currentMed as any).nickname || currentMed.name) : 'your medication'
+
+    let reply = ''
+    try {
+      const resp = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${OPENROUTER_KEY}`,
+          'Content-Type': 'application/json',
         },
-        { onConflict: 'patient_id,medication_id,scheduled_at' }
-      )
+        body: JSON.stringify({
+          model: 'openai/gpt-4o-mini',
+          messages: [
+            {
+              role: 'system',
+              content:
+                "You are Polly, an AI assistant on a medication reminder phone call. Be brief (1-2 sentences). Answer the patient's question if possible, but do not give medical advice. Always end by returning to: asking if they took the medication.",
+            },
+            {
+              role: 'user',
+              content: `Patient (${firstName}) said: ${transcript}\n\nContext: You are calling about: ${medText}.`,
+            },
+          ],
+          max_tokens: 120,
+        }),
+      })
 
-      // Log missed dose (uncertain response treated as missed)
-      if (patient) {
-        await adminLogEvent({
-          patientId,
-          ownerId: patient.owner_id,
-          eventType: 'missed_dose',
-          patientName: patient.name,
-          medicationId: currentMed.id,
-          medicationName: currentMed.name,
-          internalDetails: { callSid, transcript, reason: 'uncertain_response' },
-        })
+      if (resp.ok) {
+        const j = await resp.json()
+        reply = (j.choices?.[0]?.message?.content || '').trim()
       }
+    } catch {
+      // ignore
     }
 
-    // Notify family contacts via SMS
-    const { data: alertContacts } = await supabase
-      .from('patient_alerts')
-      .select('*')
-      .eq('patient_id', patientId)
-
-    if (alertContacts && alertContacts.length > 0) {
-      const twilioClient = twilio(TWILIO_SID, TWILIO_TOKEN)
-      const medName = currentMed
-        ? (currentMed as any).nickname || currentMed.name
-        : 'medication'
-      const patientName = patient?.name || 'Your patient'
-
-      for (const contact of alertContacts) {
-        if (contact.phone && contact.alert_sms) {
-          await twilioClient.messages.create({
-            body: `RxNudge: ${patientName} was uncertain about taking their ${medName}. Please follow up.`,
-            from: TWILIO_NUMBER,
-            to: contact.phone,
-          }).catch(() => null)
-        }
-      }
+    if (!reply) {
+      reply = `No problem, ${firstName}. Just to confirm—did you take your ${medText}?`
     }
 
-    // Continue to next med
-    const nextIndex = medIndex + 1
-    if (nextIndex < meds.length) {
-      const nextUrl = `${APP_URL}/api/twilio/voice?patientId=${patientId}&medIndex=${nextIndex}`
-      twiml.redirect({ method: 'POST' }, nextUrl)
-    } else {
-      twiml.say({ voice: 'Polly.Joanna' }, `Thank you. We weren't sure about your response, so we've notified your family. Goodbye!`)
-      twiml.hangup()
+    twiml.say({ voice: 'Polly.Joanna' }, reply)
+
+    // One more try to capture a clear YES/NO
+    const transcribeUrl = `${APP_URL}/api/twilio/transcribe?patientId=${patientId}&medIndex=${medIndex}`
+    twiml.record({
+      maxLength: 6,
+      action: transcribeUrl,
+      method: 'POST',
+      playBeep: true,
+      timeout: 6,
+    })
+
+    // If still no clear answer (no recording / unclear), schedule callback in 1 hour.
+    const scheduledFor = new Date(Date.now() + 60 * 60 * 1000)
+    await supabase.from('callbacks').insert({
+      patient_id: patientId,
+      medication_id: currentMed?.id || null,
+      scheduled_for: scheduledFor.toISOString(),
+    })
+
+    if (patient) {
+      await adminLogEvent({
+        patientId,
+        ownerId: patient.owner_id,
+        eventType: 'callback_scheduled',
+        patientName: patient.name,
+        medicationId: currentMed?.id,
+        medicationName: currentMed?.name,
+        internalDetails: { callSid, transcript, scheduledFor: scheduledFor.toISOString(), reason: 'uncertain_then_callback' },
+      })
     }
+
+    twiml.say({ voice: 'Polly.Joanna' }, `Okay ${firstName}. I'll call you back in one hour. Goodbye!`)
+    twiml.hangup()
   }
 
   return new NextResponse(twiml.toString(), { headers: { 'Content-Type': 'text/xml' } })
