@@ -85,13 +85,11 @@ async function sendSmsReminder(
 
   const firstName = patient.name.split(' ')[0]
   const medList = buildMedList(medications)
-  const firstSms = await isFirstSms(supabase, patient.id)
+  // Keep SMS copy aligned with A2P campaign samples (clear separation + STOP/HELP language)
+  // Two line breaks before compliance footer so it doesn't visually blend with the reminder.
+  const footer = '\n\nReply HELP for help. Reply STOP to opt out.'
 
-  const footer = firstSms
-    ? '\n\nReply STOP to stop reminders, HELP for help.'
-    : '\n\nReply STOP to opt out.'
-
-  const body = `Hi ${firstName}, this is your RxNudge medication reminder. Please take: ${medList}.${footer}`
+  const body = `RxNudge: Hi ${firstName} — reminder to take ${medList}. Reply YES when taken.${footer}`
 
   const msg = await client.messages.create({
     to: patient.phone,
