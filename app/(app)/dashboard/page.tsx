@@ -95,7 +95,9 @@ export default async function DashboardPage() {
           const slots = (m.reminder_times?.length || 0) > 0 ? m.reminder_times.length : 1
           const confirmed = medLogs.filter(l => l.confirmed === true).length
           const missed = medLogs.filter(l => l.confirmed === false).length
-          return { id: m.id, name: (m.nickname || m.name) as string, slots, confirmed, missed }
+          const nick = (m as any).nickname as string | undefined
+          const label = nick ? `${m.name} (${nick})` : (m.name as string)
+          return { id: m.id, name: label, slots, confirmed, missed }
         })
 
       return { patient, meds: allMeds, logs: allLogs, totalDoses: scheduledSlots, confirmedDoses, missedDoses, medRows }
