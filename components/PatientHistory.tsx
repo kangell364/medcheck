@@ -362,7 +362,7 @@ export default function PatientHistory({
       {/* Calendar month view */}
       {!loading && medications.length > 0 && (
         dateRange === '60d' ? (
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="space-y-4">
             <PatientHistoryCalendar
               timezone={timezone}
               start={start}
