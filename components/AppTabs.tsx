@@ -37,14 +37,14 @@ const tabs: Tab[] = [
   },
 ]
 
-export default function AppTabs() {
+export default function AppTabs({ className = '' }: { className?: string }) {
   const pathname = usePathname() || ''
 
   const current = tabs.find(t => (t.match ? t.match(pathname) : pathname === t.href))
   const visible = tabs.filter(t => t !== current)
 
   return (
-    <nav aria-label="App sections" className="mb-6">
+    <nav aria-label="App sections" className={`mb-6 ${className}`.trim()}>
       <div className="flex flex-wrap items-center gap-2">
         {visible.map((t) => (
           <Link

@@ -91,7 +91,7 @@ export default function PatientsPage() {
   if (loading) {
     return (
       <div className="max-w-3xl mx-auto pb-20 md:pb-0">
-        <AppTabs />
+        <AppTabs className="mt-0 mb-4" />
         <div className="flex items-center justify-between mb-8">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Members</h1>
@@ -105,7 +105,7 @@ export default function PatientsPage() {
 
   return (
     <div className="max-w-3xl mx-auto pb-20 md:pb-0">
-      <AppTabs />
+      <AppTabs className="mt-0 mb-4" />
 
       {/* Toast notifications */}
       <Toast toasts={toasts} onDismiss={dismissToast} />

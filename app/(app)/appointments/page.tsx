@@ -39,7 +39,7 @@ export default async function AppointmentsPage() {
 
   return (
     <div className="max-w-3xl mx-auto pb-20 md:pb-0">
-      <AppTabs />
+      <AppTabs className="mt-0 mb-4" />
 
       {/* Header */}
       <div className="flex items-center justify-between mb-8">

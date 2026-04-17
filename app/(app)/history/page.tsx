@@ -125,7 +125,7 @@ export default async function HistoryPage() {
 
   return (
     <div className="max-w-4xl mx-auto pb-20 md:pb-0">
-      <AppTabs />
+      <AppTabs className="mt-0 mb-4" />
 
       <div className="mb-8 flex items-start justify-between">
         <div>
