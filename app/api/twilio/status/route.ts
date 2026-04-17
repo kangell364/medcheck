@@ -21,15 +21,16 @@ export async function POST(request: NextRequest) {
       .is('confirmed', null)
 
     if (logs && logs.length > 0) {
-      // Log call failed in alert log
+      // Log call outcome in alert log
       const supabaseAdmin = createAdminClient()
       for (const log of logs) {
         await supabaseAdmin.from('alert_log').insert({
           patient_id: log.patient_id,
           medication_id: log.medication_id,
-          alert_type: 'call_failed',
+          alert_type: callStatus === 'no-answer' ? 'call_no_answer' : 'call_failed',
           message: `Reminder call ${callStatus} — could not reach patient`,
           sent_to: 'system',
+          sent_at: new Date().toISOString(),
         })
       }
     }

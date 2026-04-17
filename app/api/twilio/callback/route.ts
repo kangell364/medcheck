@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import twilio from 'twilio'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { adminLogEvent } from '@/lib/logEvent'
 
 const TWILIO_SID = process.env.TWILIO_ACCOUNT_SID!
 const TWILIO_TOKEN = process.env.TWILIO_AUTH_TOKEN!
@@ -55,6 +56,17 @@ export async function POST(request: NextRequest) {
         call_sid: call.sid,
       })
       .eq('id', callbackId)
+
+    // Log callback fulfilled
+    await adminLogEvent({
+      patientId: callback.patient_id,
+      ownerId: patient.owner_id,
+      eventType: 'callback_fulfilled',
+      patientName: patient.name,
+      medicationId: callback.medication_id ?? undefined,
+      medicationName: undefined,
+      internalDetails: { callbackId, callSid: call.sid },
+    })
 
     return NextResponse.json({ success: true, callSid: call.sid })
   } catch (err) {
