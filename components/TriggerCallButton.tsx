@@ -98,7 +98,7 @@ export default function TriggerCallButton({ patientId, patientName, medications,
       const res = await fetch('/api/twilio/outbound', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ patientId }),
+        body: JSON.stringify({ patientId, manual: true }),
       })
       const data = await res.json().catch(() => ({}))
       if (res.ok) {
@@ -167,7 +167,7 @@ export default function TriggerCallButton({ patientId, patientName, medications,
                     const res = await fetch('/api/twilio/outbound', {
                       method: 'POST',
                       headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ patientId }),
+                      body: JSON.stringify({ patientId, manual: true }),
                     })
                     const data = await res.json().catch(() => ({}))
                     if (res.ok) {
