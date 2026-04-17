@@ -6,7 +6,7 @@ export const metadata = {
 }
 
 export default function PrivacyPage() {
-  const effectiveDate = 'April 11, 2025'
+  const effectiveDate = 'April 11, 2026'
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -22,6 +22,7 @@ export default function PrivacyPage() {
           </div>
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Privacy Policy</h1>
           <p className="text-sm text-gray-500">Effective Date: {effectiveDate}</p>
+          <p className="text-sm font-bold text-gray-900 mt-3">RxNudge is a service provided by Lendpromise.</p>
         </div>
 
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 space-y-8 text-gray-700 leading-relaxed">

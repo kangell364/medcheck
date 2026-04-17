@@ -40,9 +40,19 @@ export default async function AppLayout({
   return (
     <div className="flex min-h-screen bg-gray-50">
       <Sidebar />
-      <main className="flex-1 ml-0 md:ml-64 p-6 md:p-8">
-        {children}
-      </main>
+      <div className="flex-1 ml-0 md:ml-64 flex flex-col">
+        <main className="flex-1 p-6 md:p-8">
+          {children}
+        </main>
+        <footer className="border-t border-gray-200 bg-white/60 backdrop-blur px-6 md:px-8 py-4 text-xs text-gray-500">
+          <div className="max-w-5xl">
+            <span className="font-semibold text-gray-700">RxNudge</span> is a service provided by{' '}
+            <span className="font-semibold text-gray-700">Lendpromise</span>.{' '}
+            <a href="/terms" className="text-teal-700 hover:underline">Terms</a> •{' '}
+            <a href="/privacy" className="text-teal-700 hover:underline">Privacy</a>
+          </div>
+        </footer>
+      </div>
     </div>
   )
 }

@@ -26,7 +26,17 @@ export default function RootLayout({
 
       </head>
       <body className={inter.className}>
-        {children}
+        <div className="min-h-screen flex flex-col">
+          <div className="flex-1">{children}</div>
+          <footer className="border-t border-gray-200 bg-white px-6 py-4 text-xs text-gray-500">
+            <div className="max-w-5xl mx-auto">
+              <span className="font-semibold text-gray-700">RxNudge</span> is a service provided by{' '}
+              <span className="font-semibold text-gray-700">Lendpromise</span>.{' '}
+              <a href="/terms" className="text-teal-700 hover:underline">Terms</a> •{' '}
+              <a href="/privacy" className="text-teal-700 hover:underline">Privacy</a>
+            </div>
+          </footer>
+        </div>
       </body>
     </html>
   )
