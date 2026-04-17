@@ -105,7 +105,28 @@ export default async function DashboardPage() {
       const monthConfirmed = (monthLogs || []).filter(l => l.confirmed === true).length
       const monthPct = monthTotal > 0 ? Math.round((monthConfirmed / monthTotal) * 100) : null
 
-      return { patient, meds: allMeds, logs: allLogs, totalDoses, confirmedDoses, missedDoses, periodStatus, lastLog, monthPct }
+      // Total scheduled doses today = sum of reminder time slots (default 1 per med)
+      const scheduledSlots = allMeds.reduce((sum, m) => sum + ((m.reminder_times?.length || 0) > 0 ? m.reminder_times.length : 1), 0)
+
+      // Group today's logs by medication to render per-med status rows
+      const logsByMedId = allLogs.reduce((acc, l) => {
+        const k = l.medication_id
+        if (!k) return acc
+        ;(acc[k] ||= []).push(l)
+        return acc
+      }, {} as Record<string, DoseLog[]>)
+
+      const medRows = allMeds
+        .filter(m => (m as any).active !== false)
+        .map(m => {
+          const medLogs = logsByMedId[m.id] || []
+          const slots = (m.reminder_times?.length || 0) > 0 ? m.reminder_times.length : 1
+          const confirmed = medLogs.filter(l => l.confirmed === true).length
+          const missed = medLogs.filter(l => l.confirmed === false).length
+          return { id: m.id, name: (m.nickname || m.name) as string, slots, confirmed, missed }
+        })
+
+      return { patient, meds: allMeds, logs: allLogs, totalDoses: scheduledSlots, confirmedDoses, missedDoses, periodStatus, lastLog, monthPct, medRows }
     })
   )
 
@@ -161,7 +182,7 @@ export default async function DashboardPage() {
       {/* Patient cards */}
       {patientData.length > 0 && (
         <div className="grid gap-6 md:grid-cols-2">
-          {patientData.map(({ patient, totalDoses, confirmedDoses, missedDoses, periodStatus, lastLog, monthPct }) => {
+          {patientData.map(({ patient, totalDoses, confirmedDoses, missedDoses, periodStatus, lastLog, monthPct, medRows }) => {
             const pct = totalDoses > 0 ? Math.round((confirmedDoses / totalDoses) * 100) : 0
             const statusColor = pct === 100 ? 'text-emerald-600' : missedDoses > 0 ? 'text-red-500' : 'text-amber-500'
             const statusBg = pct === 100 ? 'bg-emerald-50 border-emerald-200' : missedDoses > 0 ? 'bg-red-50 border-red-200' : 'bg-amber-50 border-amber-200'
@@ -226,7 +247,7 @@ export default async function DashboardPage() {
                   )}
                 </div>
 
-                <div className="mb-4">
+                <div className="mb-3">
                   <div className="flex justify-between text-sm text-gray-600 mb-1">
                     <span>{confirmedDoses} of {totalDoses} doses taken today</span>
                     {missedDoses > 0 && <span className="text-red-500">{missedDoses} missed</span>}
@@ -238,6 +259,29 @@ export default async function DashboardPage() {
                     />
                   </div>
                 </div>
+
+                {/* Per-medication rows */}
+                {medRows && medRows.length > 0 && (
+                  <div className="mb-4 divide-y divide-gray-100 rounded-xl border border-gray-100 bg-white/60">
+                    {medRows.map(m => {
+                      const mpct = m.slots > 0 ? Math.round((m.confirmed / m.slots) * 100) : 0
+                      const mColor = mpct === 100 ? 'text-emerald-700' : m.missed > 0 ? 'text-red-700' : 'text-amber-700'
+                      return (
+                        <Link
+                          key={m.id}
+                          href={`/patients/${patient.id}?log=true&med=${m.id}`}
+                          className="flex items-center justify-between px-4 py-2.5 hover:bg-white transition-colors"
+                        >
+                          <div className="min-w-0">
+                            <p className="text-sm font-semibold text-gray-800 truncate">{m.name}</p>
+                            <p className={`text-xs ${mColor}`}>{m.confirmed}/{m.slots} today{m.missed > 0 ? ` • ${m.missed} missed` : ''}</p>
+                          </div>
+                          <div className={`text-sm font-semibold ${mColor}`}>{mpct}%</div>
+                        </Link>
+                      )
+                    })}
+                  </div>
+                )}
 
                 <div className="flex gap-2">
                   <Link
