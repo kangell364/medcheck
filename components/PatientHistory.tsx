@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Medication, DoseLog } from '@/lib/types'
+import PatientHistoryCalendar from '@/components/PatientHistoryCalendar'
 
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -360,185 +361,16 @@ export default function PatientHistory({
 
       {/* Calendar month view */}
       {!loading && medications.length > 0 && (
-        <>
-          {/* Legend */}
-          <div className="flex flex-wrap gap-4 mb-4 text-xs text-gray-500">
-            <div className="flex items-center gap-1.5">
-              <div className="w-3 h-3 rounded bg-emerald-500" /> Taken
-            </div>
-            <div className="flex items-center gap-1.5">
-              <div className="w-3 h-3 rounded bg-teal-300" /> Logged late (manual)
-            </div>
-            <div className="flex items-center gap-1.5">
-              <div className="w-3 h-3 rounded bg-amber-300" /> Skipped
-            </div>
-            <div className="flex items-center gap-1.5">
-              <div className="w-3 h-3 rounded bg-red-400" /> Missed
-            </div>
-            <div className="flex items-center gap-1.5">
-              <div className="w-3 h-3 rounded bg-gray-100 border border-gray-200" /> No data
-            </div>
-          </div>
-
-          <div className="overflow-x-auto">
-            <div className="min-w-max">
-
-              {/* Date header row — must use same gap-1 as data rows so labels align precisely */}
-              <div className="flex items-end gap-1 mb-2">
-                <div className="w-44 shrink-0 sticky left-0 z-20 bg-white" />
-                {/* Second sticky spacer: left-0 + w-44(176px) + gap-1(4px) = 180px */}
-                <div className="w-20 shrink-0 sticky left-[180px] z-20 bg-white" />
-                {days.map((day, i) => {
-                  // Show label every 7th day and always on last day
-                  const step = days.length <= 7 ? 1 : days.length <= 14 ? 2 : 7
-                  const showLabel = i % step === 0 || i === days.length - 1
-                  return (
-                    <div key={i} className="w-7 shrink-0 text-center overflow-visible">
-                      {showLabel && (
-                        <span className="text-[10px] text-gray-400 leading-none whitespace-nowrap">
-                          {day.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                        </span>
-                      )}
-                    </div>
-                  )
-                })}
-              </div>
-
-              {/* One grouped block per medication */}
-              {medications.map((med, medIdx) => {
-                const isInactive = !med.active
-                const displayName = med.name
-                const times = med.reminder_times.length > 0 ? med.reminder_times : ['00:00']
-
-                const logsForThisMed = doseLogs.filter(l => l.medication_id === med.id)
-                const snapshotName = logsForThisMed.find(l => l.medication_name)?.medication_name ?? null
-
-                const medStartDate = med.start_date as string | null
-                const medDaysCount = getDaysFromStartDate(med)
-                const medTotalSlots = times.length * medDaysCount
-                const medConfirmed = times.reduce((sum, rt) => {
-                  const byDate = slotMap[med.id]?.[rt] ?? {}
-                  return sum + Object.values(byDate).filter((l: DoseLog) => {
-                    if (l.confirmed !== true) return false
-                    if (!medStartDate) return true
-                    return scheduledDateInTz(l.scheduled_at, timezone) >= medStartDate
-                  }).length
-                }, 0)
-                const medMissed = times.reduce((sum, rt) => {
-                  const byDate = slotMap[med.id]?.[rt] ?? {}
-                  return sum + Object.values(byDate).filter((l: DoseLog) => {
-                    if (l.confirmed !== false) return false
-                    if (!medStartDate) return true
-                    return scheduledDateInTz(l.scheduled_at, timezone) >= medStartDate
-                  }).length
-                }, 0)
-                const medPct = medTotalSlots > 0 ? Math.round((medConfirmed / medTotalSlots) * 100) : 0
-
-                const isLastMed = medIdx === medications.length - 1
-                const headingName = isInactive ? (snapshotName || displayName) : displayName
-
-                return (
-                  <div
-                    key={med.id}
-                    className={`${!isLastMed ? 'mb-4 pb-4 border-b border-gray-100' : 'mb-2'} ${isInactive ? 'opacity-60' : ''}`}
-                  >
-                    {times.map((rt, timeIdx) => {
-                      const isFirstTime = timeIdx === 0
-                      const byDate = slotMap[med.id]?.[rt] ?? {}
-
-                      return (
-                        <div key={rt} className="flex items-center gap-1 min-h-[2rem]">
-
-                          {/* Sticky med name column */}
-                          <div className="w-44 shrink-0 sticky left-0 z-10 bg-white self-stretch flex flex-col justify-center pr-2">
-                            {isFirstTime ? (
-                              <>
-                                <p className={`text-sm font-semibold truncate leading-tight ${isInactive ? 'line-through text-gray-400' : 'text-gray-800'}`}>
-                                  {headingName}
-                                </p>
-                                                <div className="flex items-center gap-2 mt-0.5">
-                                  {isInactive ? (
-                                    <span className="text-xs text-gray-400 font-medium">archived</span>
-                                  ) : (
-                                    <>
-                                      <span className={`text-xs font-bold ${medPct >= 80 ? 'text-teal-600' : medPct >= 50 ? 'text-amber-500' : 'text-red-500'}`}>
-                                        {medPct}%
-                                      </span>
-                                      {medMissed > 0 && (
-                                        <span className="text-xs text-red-400">{medMissed} missed</span>
-                                      )}
-                                    </>
-                                  )}
-                                </div>
-                              </>
-                            ) : (
-                              <div />
-                            )}
-                          </div>
-
-                          {/* Sticky time column: left-0 + w-44(176px) + gap-1(4px) = 180px */}
-                          <div className="w-20 shrink-0 sticky left-[180px] z-10 bg-white pr-2 self-stretch flex items-center">
-                            <span className="text-xs font-medium text-gray-500 whitespace-nowrap">
-                              {formatTime(rt)}
-                            </span>
-                          </div>
-
-                          {/* Day dots */}
-                          {dayDateStrs.map((dateStr, dayIdx) => {
-                            // Hide cells before start_date — render empty spacer (not counted in adherence)
-                            if (medStartDate && dateStr < medStartDate) {
-                              return <div key={dayIdx} className="w-7 h-7 shrink-0" />
-                            }
-
-                            const log = byDate[dateStr]
-
-                            let bg = 'bg-gray-100 border border-gray-200'
-                            const logMedName = log?.medication_name || med.name
-                            let title = `${days[dayIdx].toLocaleDateString()} ${formatTime(rt)} — No data`
-
-                            if (log) {
-                              // Skipped = confirmed:false, method:'manual' (app skip button)
-                            // Manual/late = confirmed:true, method:'manual' (caregiver manual log)
-                            if (log.confirmed === true && log.method === 'manual') {
-                                bg = 'bg-teal-300'
-                                title = `${days[dayIdx].toLocaleDateString()} ${formatTime(rt)} — 📝 Logged late (${logMedName})`
-                                if (log.confirmed_at) {
-                                  title += ` at ${new Date(log.confirmed_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
-                                }
-                              } else if (log.confirmed === true) {
-                                bg = 'bg-emerald-500'
-                                title = `${days[dayIdx].toLocaleDateString()} ${formatTime(rt)} — ✅ Taken (${logMedName})`
-                                if (log.confirmed_at) {
-                                  title += ` at ${new Date(log.confirmed_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
-                                }
-                              } else if (log.confirmed === false && log.method === 'manual') {
-                                bg = 'bg-amber-300'
-                                title = `${days[dayIdx].toLocaleDateString()} ${formatTime(rt)} — ⏭️ Skipped (${logMedName})`
-                              } else if (log.confirmed === false) {
-                                bg = 'bg-red-400'
-                                title = `${days[dayIdx].toLocaleDateString()} ${formatTime(rt)} — ❌ Missed (${logMedName})`
-                              }
-                            }
-
-                            const isToday = dateStr === todayStr
-
-                            return (
-                              <div
-                                key={dayIdx}
-                                className={`w-7 h-7 shrink-0 rounded-md ${bg} ${isToday ? 'ring-2 ring-teal-500 ring-offset-1' : ''} cursor-pointer`}
-                                title={title}
-                              />
-                            )
-                          })}
-                        </div>
-                      )
-                    })}
-                  </div>
-                )
-              })}
-            </div>
-          </div>
-        </>
+        <PatientHistoryCalendar
+          timezone={timezone}
+          start={start}
+          end={end}
+          visibleMonth={visibleMonth}
+          setVisibleMonth={setVisibleMonth}
+          medications={medications}
+          doseLogs={doseLogs}
+          slotMap={slotMap}
+        />
       )}
     </div>
   )
