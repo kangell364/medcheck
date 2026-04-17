@@ -91,7 +91,6 @@ export default function PatientsPage() {
   if (loading) {
     return (
       <div className="max-w-3xl mx-auto pb-20 md:pb-0">
-        <AppTabs className="mt-0 mb-4" />
         <div className="flex items-center justify-between mb-8">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Members</h1>
@@ -105,7 +104,6 @@ export default function PatientsPage() {
 
   return (
     <div className="max-w-3xl mx-auto pb-20 md:pb-0">
-      <AppTabs className="mt-0 mb-4" />
 
       {/* Toast notifications */}
       <Toast toasts={toasts} onDismiss={dismissToast} />
@@ -130,7 +128,7 @@ export default function PatientsPage() {
         </div>
       )}
 
-      <div className="flex items-center justify-between mb-8">
+      <div className="flex items-center justify-between mb-3">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Members</h1>
           <p className="text-gray-500 mt-1">Manage medication tracking for your members</p>
@@ -142,6 +140,8 @@ export default function PatientsPage() {
           <span>➕</span> Add Member
         </Link>
       </div>
+
+      <AppTabs className="mt-0 mb-6" />
 
       {patients.length === 0 ? (
         <div className="bg-white rounded-2xl border-2 border-dashed border-gray-200 p-12 text-center">
