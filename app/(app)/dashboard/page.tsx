@@ -262,25 +262,6 @@ export default async function DashboardPage() {
         </div>
       )}
 
-      {/* Recent Alerts */}
-      {recentAlerts && recentAlerts.length > 0 && (
-        <div className="mt-8">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Recent Alerts</h2>
-          <div className="bg-white rounded-2xl border border-gray-100 divide-y divide-gray-100">
-            {recentAlerts.map((alert: any) => (
-              <div key={alert.id} className="px-5 py-4 flex items-start gap-3">
-                <span className="text-xl mt-0.5">🔔</span>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm text-gray-800">{alert.message}</p>
-                  <p className="text-xs text-gray-400 mt-1">
-                    {new Date(alert.sent_at).toLocaleString()} • sent to {alert.sent_to}
-                  </p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
     </div>
   )
 }
