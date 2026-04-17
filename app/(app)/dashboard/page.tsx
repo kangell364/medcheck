@@ -262,21 +262,23 @@ export default async function DashboardPage() {
 
                 {/* Per-medication rows */}
                 {medRows && medRows.length > 0 && (
-                  <div className="mb-4 divide-y divide-gray-100 rounded-xl border border-gray-100 bg-white/60">
+                  <div className="mb-4 space-y-2">
                     {medRows.map(m => {
                       const mpct = m.slots > 0 ? Math.round((m.confirmed / m.slots) * 100) : 0
-                      const mColor = mpct === 100 ? 'text-emerald-700' : m.missed > 0 ? 'text-red-700' : 'text-amber-700'
+                      const barColor = mpct === 100 ? 'bg-emerald-500' : m.missed > 0 ? 'bg-red-400' : 'bg-amber-400'
                       return (
                         <Link
                           key={m.id}
                           href={`/patients/${patient.id}?log=true&med=${m.id}`}
-                          className="flex items-center justify-between px-4 py-2.5 hover:bg-white transition-colors"
+                          className="block rounded-xl border border-gray-100 bg-white/60 px-4 py-2.5 hover:bg-white transition-colors"
                         >
-                          <div className="min-w-0">
+                          <div className="flex items-center justify-between gap-3">
                             <p className="text-sm font-semibold text-gray-800 truncate">{m.name}</p>
-                            <p className={`text-xs ${mColor}`}>{m.confirmed}/{m.slots} today{m.missed > 0 ? ` • ${m.missed} missed` : ''}</p>
+                            <p className="text-xs text-gray-500 whitespace-nowrap">{m.confirmed}/{m.slots} today</p>
                           </div>
-                          <div className={`text-sm font-semibold ${mColor}`}>{mpct}%</div>
+                          <div className="mt-2 w-full bg-gray-200 rounded-full h-2">
+                            <div className={`h-2 rounded-full ${barColor}`} style={{ width: `${mpct}%` }} />
+                          </div>
                         </Link>
                       )
                     })}
