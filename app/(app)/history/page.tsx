@@ -125,9 +125,8 @@ export default async function HistoryPage() {
 
   return (
     <div className="max-w-4xl mx-auto pb-20 md:pb-0">
-      <AppTabs className="mt-0 mb-4" />
 
-      <div className="mb-8 flex items-start justify-between">
+      <div className="mb-3 flex items-start justify-between">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Adherence History</h1>
           <p className="text-gray-500 mt-1">Last 30 days — per medication breakdown</p>
@@ -140,6 +139,8 @@ export default async function HistoryPage() {
           />
         </div>
       </div>
+
+      <AppTabs className="mt-0 mb-6" />
 
       {patientData.length === 0 && (
         <div className="bg-white rounded-2xl border-2 border-dashed border-gray-200 p-12 text-center">

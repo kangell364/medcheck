@@ -39,10 +39,9 @@ export default async function AppointmentsPage() {
 
   return (
     <div className="max-w-3xl mx-auto pb-20 md:pb-0">
-      <AppTabs className="mt-0 mb-4" />
 
       {/* Header */}
-      <div className="flex items-center justify-between mb-8">
+      <div className="flex items-center justify-between mb-3">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Appointments</h1>
           <p className="text-gray-500 mt-1">Manage patient appointments and reminders</p>
@@ -54,6 +53,8 @@ export default async function AppointmentsPage() {
           <span>+</span> Add Appointment
         </Link>
       </div>
+
+      <AppTabs className="mt-0 mb-6" />
 
       {/* Appointments list */}
       {(!appointments || appointments.length === 0) ? (

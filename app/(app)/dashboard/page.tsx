@@ -136,7 +136,7 @@ export default async function DashboardPage() {
       />
 
       {/* Top nav tabs (hide current section) */}
-      <AppTabs className="mt-0 mb-4" />
+      <AppTabs className="mt-0 mb-6" />
 
       {/* No patients yet */}
       {(!patients || patients.length === 0) && (
