@@ -29,7 +29,7 @@ export async function POST(request: NextRequest) {
       // Find patient by phone number (any status)
       const { data: patient } = await supabase
         .from('patients')
-        .select('id, name, owner_id')
+        .select('id, name, owner_id, phone')
         .eq('phone', fromNumber)
         .limit(1)
         .single()
@@ -43,6 +43,29 @@ export async function POST(request: NextRequest) {
             sms_opted_out_at: new Date().toISOString(),
           })
           .eq('id', patient.id)
+
+        // Notify all alert contacts except the patient
+        const { data: alerts } = await supabase
+          .from('patient_alerts')
+          .select('phone, alert_sms')
+          .eq('patient_id', patient.id)
+          .eq('alert_sms', true)
+
+        const msgBody = `⚠️ ${patient.name} opted out of RxNudge reminders (STOP). You may want to check in.`
+
+        for (const a of alerts || []) {
+          if (!a.phone) continue
+          if (a.phone === patient.phone) continue
+          try {
+            await twilio(process.env.TWILIO_ACCOUNT_SID!, process.env.TWILIO_AUTH_TOKEN!).messages.create({
+              to: a.phone,
+              from: process.env.TWILIO_PHONE_NUMBER!,
+              body: msgBody,
+            })
+          } catch (e) {
+            console.error('[twilio/inbound] Failed to notify alert contact:', e)
+          }
+        }
       }
 
       // Must reply even if we don't recognize the number
