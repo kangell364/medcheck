@@ -58,13 +58,6 @@ export default function ManualLogButton({
         return
       }
 
-        .from('dose_logs')
-        .select('id')
-        .eq('patient_id', patientId)
-        .eq('medication_id', medicationId)
-        .gte('scheduled_at', `${dateStr}T00:00:00`)
-        .lte('scheduled_at', `${dateStr}T23:59:59`)
-        .maybeSingle()
 
       if (existing) {
         const { error: updateError } = await supabase.from('dose_logs').update({
