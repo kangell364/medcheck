@@ -41,6 +41,7 @@ export default function ManualLogButton({
     try {
       const dateStr = new Date().toLocaleDateString('en-CA', { timeZone: patientTimezone })
       const scheduledAt = `${dateStr}T${takenTime}:00`
+      const scheduledAtPlus = `${dateStr}T${takenTime}:00.000Z`
       const now = new Date().toISOString()
 
       const { data: existingRows, error: existingError } = await supabase
@@ -62,12 +63,31 @@ export default function ManualLogButton({
 
 
       if (existing) {
+        // If the chosen time already exists as another row, fall back to updating WITHOUT changing scheduled_at.
         const { error: updateError } = await supabase.from('dose_logs').update({
           confirmed: true,
           confirmed_at: now,
           method: 'manual',
           scheduled_at: scheduledAt,
         }).eq('id', existing.id)
+
+        if (updateError && /duplicate key value violates unique constraint/i.test(updateError.message)) {
+          const { error: fallbackError } = await supabase.from('dose_logs').update({
+            confirmed: true,
+            confirmed_at: now,
+            method: 'manual',
+          }).eq('id', existing.id)
+
+          if (fallbackError) {
+            console.error('[ManualLogButton] update fallback error', fallbackError)
+            alert(`Could not log dose: ${fallbackError.message}`)
+            return
+          }
+
+          setShowModal(false)
+          router.refresh()
+          return
+        }
 
         if (updateError) {
           console.error('[ManualLogButton] update error', updateError)
@@ -84,6 +104,41 @@ export default function ManualLogButton({
           confirmed_at: now,
           method: 'manual',
         })
+
+        // If a row already exists for that exact scheduled_at, just update that row instead.
+        if (insertError && /duplicate key value violates unique constraint/i.test(insertError.message)) {
+          const { data: existingExact, error: exactErr } = await supabase
+            .from('dose_logs')
+            .select('id')
+            .eq('patient_id', patientId)
+            .eq('medication_id', medicationId)
+            .eq('scheduled_at', scheduledAt)
+            .maybeSingle()
+
+          if (exactErr) {
+            console.error('[ManualLogButton] exact lookup error', exactErr)
+            alert(`Could not log dose: ${exactErr.message}`)
+            return
+          }
+
+          if (existingExact?.id) {
+            const { error: exactUpdateErr } = await supabase.from('dose_logs').update({
+              confirmed: true,
+              confirmed_at: now,
+              method: 'manual',
+            }).eq('id', existingExact.id)
+
+            if (exactUpdateErr) {
+              console.error('[ManualLogButton] exact update error', exactUpdateErr)
+              alert(`Could not log dose: ${exactUpdateErr.message}`)
+              return
+            }
+
+            setShowModal(false)
+            router.refresh()
+            return
+          }
+        }
 
         if (insertError) {
           console.error('[ManualLogButton] insert error', insertError)
