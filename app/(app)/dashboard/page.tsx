@@ -155,7 +155,7 @@ export default async function DashboardPage() {
 
       {/* Patient cards */}
       {patientData.length > 0 && (
-        <div className="grid gap-6 md:grid-cols-2">
+        <div className="grid gap-6">
           {patientData.map(({ patient, totalDoses, confirmedDoses, missedDoses, medRows }) => {
             const pct = totalDoses > 0 ? Math.round((confirmedDoses / totalDoses) * 100) : 0
             const statusBg = pct === 100 ? 'bg-emerald-50 border-emerald-200' : missedDoses > 0 ? 'bg-red-50 border-red-200' : 'bg-amber-50 border-amber-200'
