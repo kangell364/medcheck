@@ -43,6 +43,7 @@ export default function ManualLogButton({
       const scheduledAt = `${dateStr}T${takenTime}:00`
       const now = new Date().toISOString()
       const takenAtIso = new Date(`${dateStr}T${takenTime}:00`).toISOString()
+      const scheduledSlotIso = new Date(`${dateStr}T${scheduledTime}:00`).toISOString()
 
       const { data: existingRows, error: existingError } = await supabase
         .from('dose_logs')
@@ -86,6 +87,8 @@ export default function ManualLogButton({
             confirmed: true,
             confirmed_at: takenAtIso,
             method: 'manual',
+            // Ensure the record belongs to THIS scheduled row
+            scheduled_at: scheduledSlotIso,
           })
           .eq('id', pickedId)
 
@@ -99,7 +102,7 @@ export default function ManualLogButton({
           patient_id: patientId,
           medication_id: medicationId,
           medication_name: medicationName,
-          scheduled_at: scheduledAt,
+          scheduled_at: scheduledSlotIso,
           confirmed: true,
           confirmed_at: takenAtIso,
           method: 'manual',
@@ -112,7 +115,7 @@ export default function ManualLogButton({
             .select('id')
             .eq('patient_id', patientId)
             .eq('medication_id', medicationId)
-            .eq('scheduled_at', scheduledAt)
+            .eq('scheduled_at', scheduledSlotIso)
             .maybeSingle()
 
           if (exactErr) {

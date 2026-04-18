@@ -184,35 +184,14 @@ export default function PatientTabs({
     }
   }
 
-  // Find the dose_log for a specific med + reminder_time slot
-  // Important: if both a missed log and a confirmed log exist for the same slot/day,
-  // always prefer the confirmed one (especially manual confirmations).
+  // Find the dose_log for a specific med + reminder_time slot.
+  // Use a strict match on the scheduled slot time (not fuzzy) so logging one row
+  // can never change another row.
   function getSlotLog(medId: string, reminderTime: string): DoseLog | undefined {
-    const med = medications.find(m => m.id === medId)
-    if (!med) return undefined
+    const today = new Date().toLocaleDateString('en-CA', { timeZone: patient.timezone })
+    const slot = `${today}T${reminderTime}:00`
 
-    const [rh, rm] = reminderTime.split(':').map(Number)
-    const rtMins = rh * 60 + rm
-
-    const candidates: { log: DoseLog; diff: number }[] = []
-    for (const log of todayLogs) {
-      if (log.medication_id !== medId) continue
-      const lt = getLogTimeInTz(log.scheduled_at)
-      const [lh, lm] = lt.split(':').map(Number)
-      const diff = Math.abs(lh * 60 + lm - rtMins)
-      if (diff <= 90) candidates.push({ log, diff })
-    }
-
-    if (candidates.length === 0) return undefined
-
-    const confirmed = candidates.filter(c => c.log.confirmed === true)
-    const pool = confirmed.length ? confirmed : candidates
-
-    const manualConfirmed = pool.filter(c => c.log.confirmed === true && c.log.method === 'manual')
-    const pool2 = manualConfirmed.length ? manualConfirmed : pool
-
-    pool2.sort((a, b) => a.diff - b.diff)
-    return pool2[0].log
+    return todayLogs.find(l => l.medication_id === medId && l.scheduled_at === slot)
   }
 
   // Slot status: confirmed | missed | skipped | snoozed | pending
