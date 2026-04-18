@@ -216,31 +216,9 @@ export default function PatientTabs({
   }
 
   // Slot status: confirmed | missed | skipped | snoozed | pending
-  function getMedConfirmedLogToday(medId: string): DoseLog | undefined {
-    const confirmed = todayLogs.filter(l => l.medication_id === medId && l.confirmed === true)
-    if (!confirmed.length) return undefined
-
-    // Prefer manual confirmations first
-    const manual = confirmed.filter(l => l.method === 'manual')
-    const pool = manual.length ? manual : confirmed
-
-    // Prefer the most recent confirmed_at (fallback to scheduled_at)
-    pool.sort((a, b) => {
-      const atA = (a.confirmed_at || a.scheduled_at || '')
-      const atB = (b.confirmed_at || b.scheduled_at || '')
-      return atB.localeCompare(atA)
-    })
-    return pool[0]
-  }
-
   function getSlotStatus(medId: string, reminderTime: string): 'confirmed' | 'missed' | 'skipped' | 'snoozed' | 'pending' {
     const optimisticSnooze = snoozeMap[medId]
     if (optimisticSnooze && new Date(optimisticSnooze) > new Date()) return 'snoozed'
-
-    // If ANY confirmed log exists for this med today, treat the slot as confirmed.
-    // This prevents the UI from staying "Missed" when a manual log was recorded.
-    const hasConfirmedToday = !!getMedConfirmedLogToday(medId)
-    if (hasConfirmedToday) return 'confirmed'
 
     const log = getSlotLog(medId, reminderTime)
     if (!log) {
@@ -432,7 +410,7 @@ export default function PatientTabs({
                       <div className="space-y-2 mb-3">
                         {times.map(rt => {
                           const slotStatus = getSlotStatus(med.id, rt)
-                          const slotLog = getSlotLog(med.id, rt) || getMedConfirmedLogToday(med.id)
+                          const slotLog = getSlotLog(med.id, rt)
 
                           const slotStatusConfig = {
                             confirmed: { icon: '✅', label: 'Taken', class: 'bg-emerald-50 border-emerald-200 text-emerald-700' },

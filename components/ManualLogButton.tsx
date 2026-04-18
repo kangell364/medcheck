@@ -101,7 +101,7 @@ export default function ManualLogButton({
           medication_name: medicationName,
           scheduled_at: scheduledAt,
           confirmed: true,
-          confirmed_at: now,
+          confirmed_at: takenAtIso,
           method: 'manual',
         })
 
@@ -124,7 +124,7 @@ export default function ManualLogButton({
           if (existingExact?.id) {
             const { error: exactUpdateErr } = await supabase.from('dose_logs').update({
               confirmed: true,
-              confirmed_at: now,
+              confirmed_at: takenAtIso,
               method: 'manual',
             }).eq('id', existingExact.id)
 
