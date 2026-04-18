@@ -23,16 +23,41 @@ export default function ManualLogButton({
   const [takenTime, setTakenTime] = useState(scheduledTime)
   const [saving, setSaving] = useState(false)
   const router = useRouter()
-  const supabase = createClient()
+  const supabase = (() => {
+    try {
+      return createClient()
+    } catch {
+      return null
+    }
+  })()
 
   async function handleSave() {
+    if (!supabase) {
+      alert('App is not configured yet. Missing Supabase environment variables.')
+      return
+    }
+
     setSaving(true)
     try {
       const dateStr = new Date().toLocaleDateString('en-CA', { timeZone: patientTimezone })
       const scheduledAt = `${dateStr}T${takenTime}:00`
       const now = new Date().toISOString()
 
-      const { data: existing } = await supabase
+      const { data: existing, error: existingError } = await supabase
+         .from('dose_logs')
+         .select('id')
+         .eq('patient_id', patientId)
+         .eq('medication_id', medicationId)
+         .gte('scheduled_at', `${dateStr}T00:00:00`)
+         .lte('scheduled_at', `${dateStr}T23:59:59`)
+         .maybeSingle()
+
+      if (existingError) {
+        console.error('[ManualLogButton] lookup error', existingError)
+        alert(`Could not log dose: ${existingError.message}`)
+        return
+      }
+
         .from('dose_logs')
         .select('id')
         .eq('patient_id', patientId)
@@ -42,14 +67,20 @@ export default function ManualLogButton({
         .maybeSingle()
 
       if (existing) {
-        await supabase.from('dose_logs').update({
+        const { error: updateError } = await supabase.from('dose_logs').update({
           confirmed: true,
           confirmed_at: now,
           method: 'manual',
           scheduled_at: scheduledAt,
         }).eq('id', existing.id)
+
+        if (updateError) {
+          console.error('[ManualLogButton] update error', updateError)
+          alert(`Could not log dose: ${updateError.message}`)
+          return
+        }
       } else {
-        await supabase.from('dose_logs').insert({
+        const { error: insertError } = await supabase.from('dose_logs').insert({
           patient_id: patientId,
           medication_id: medicationId,
           medication_name: medicationName,
@@ -58,6 +89,12 @@ export default function ManualLogButton({
           confirmed_at: now,
           method: 'manual',
         })
+
+        if (insertError) {
+          console.error('[ManualLogButton] insert error', insertError)
+          alert(`Could not log dose: ${insertError.message}`)
+          return
+        }
       }
 
       setShowModal(false)
