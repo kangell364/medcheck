@@ -220,6 +220,11 @@ export default function PatientTabs({
     const optimisticSnooze = snoozeMap[medId]
     if (optimisticSnooze && new Date(optimisticSnooze) > new Date()) return 'snoozed'
 
+    // If ANY confirmed log exists for this med today, treat the slot as confirmed.
+    // This prevents the UI from staying "Missed" when a manual log was recorded.
+    const hasConfirmedToday = todayLogs.some(l => l.medication_id === medId && l.confirmed === true)
+    if (hasConfirmedToday) return 'confirmed'
+
     const log = getSlotLog(medId, reminderTime)
     if (!log) {
       // Check if past due
