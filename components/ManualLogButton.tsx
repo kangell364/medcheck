@@ -42,17 +42,35 @@ export default function ManualLogButton({
       const dateStr = new Date().toLocaleDateString('en-CA', { timeZone: patientTimezone })
       const scheduledAt = `${dateStr}T${takenTime}:00`
       const now = new Date().toISOString()
+      const takenAtIso = new Date(`${dateStr}T${takenTime}:00`).toISOString()
 
       const { data: existingRows, error: existingError } = await supabase
         .from('dose_logs')
-        .select('id')
+        .select('id, scheduled_at')
         .eq('patient_id', patientId)
         .eq('medication_id', medicationId)
         .gte('scheduled_at', `${dateStr}T00:00:00`)
         .lte('scheduled_at', `${dateStr}T23:59:59`)
         .order('scheduled_at', { ascending: false })
 
-      const existing = (existingRows && existingRows.length > 0) ? existingRows[0] : null
+      const rows = existingRows || []
+      const toMins = (hhmm: string) => {
+        const [h, m] = hhmm.split(':').map(Number)
+        return h * 60 + m
+      }
+      const targetMins = toMins(scheduledTime)
+      // Pick the row closest to the scheduled slot time (within 90 minutes)
+      const existing = rows
+        .map(r => {
+          const t = (r as any).scheduled_at as string
+          const d = new Date(t)
+          const hh = d.toLocaleTimeString('en-US', { timeZone: patientTimezone, hour12: false, hour: '2-digit', minute: '2-digit' })
+          const diff = Math.abs(toMins(hh) - targetMins)
+          return { id: (r as any).id as string, diff }
+        })
+        .sort((a, b) => a.diff - b.diff)[0] || null
+
+      const pickedId = existing && existing.diff <= 90 ? existing.id : null
 
       if (existingError) {
         console.error('[ManualLogButton] lookup error', existingError)
@@ -61,22 +79,15 @@ export default function ManualLogButton({
       }
 
 
-      if (existing) {
-        // Update the row matching this scheduled slot. If there are duplicates for the day,
-        // we should NOT update an arbitrary row; we want the row for THIS reminder time.
-        const scheduledSlot = `${dateStr}T${scheduledTime}:00`
-
+      if (pickedId) {
         const { error: updateError } = await supabase
           .from('dose_logs')
           .update({
             confirmed: true,
-            // Record the chosen actual time in confirmed_at.
-            confirmed_at: new Date(`${dateStr}T${takenTime}:00`).toISOString(),
+            confirmed_at: takenAtIso,
             method: 'manual',
           })
-          .eq('patient_id', patientId)
-          .eq('medication_id', medicationId)
-          .eq('scheduled_at', scheduledSlot)
+          .eq('id', pickedId)
 
         if (updateError) {
           console.error('[ManualLogButton] update error', updateError)
