@@ -41,7 +41,6 @@ export default function ManualLogButton({
     try {
       const dateStr = new Date().toLocaleDateString('en-CA', { timeZone: patientTimezone })
       const scheduledAt = `${dateStr}T${takenTime}:00`
-      const scheduledAtPlus = `${dateStr}T${takenTime}:00.000Z`
       const now = new Date().toISOString()
 
       const { data: existingRows, error: existingError } = await supabase
@@ -63,29 +62,27 @@ export default function ManualLogButton({
 
 
       if (existing) {
-        // If the chosen time already exists as another row, fall back to updating WITHOUT changing scheduled_at.
-        const { error: updateError } = await supabase.from('dose_logs').update({
-          confirmed: true,
-          confirmed_at: now,
-          method: 'manual',
-          scheduled_at: scheduledAt,
-        }).eq('id', existing.id)
+        // Update the row matching this scheduled slot. If there are duplicates for the day,
+        // we should NOT update an arbitrary row; we want the row for THIS reminder time.
+        const scheduledSlot = `${dateStr}T${scheduledTime}:00`
 
-        if (updateError && /duplicate key value violates unique constraint/i.test(updateError.message)) {
-          const { error: fallbackError } = await supabase.from('dose_logs').update({
+        const { error: updateError } = await supabase
+          .from('dose_logs')
+          .update({
             confirmed: true,
             confirmed_at: now,
             method: 'manual',
-          }).eq('id', existing.id)
+            // Keep scheduled_at as the scheduled slot; record actual time in confirmed_at.
+            // (We don't currently have a separate taken_at column.)
+            confirmed_at: new Date(`${dateStr}T${takenTime}:00`).toISOString(),
+          })
+          .eq('patient_id', patientId)
+          .eq('medication_id', medicationId)
+          .eq('scheduled_at', scheduledSlot)
 
-          if (fallbackError) {
-            console.error('[ManualLogButton] update fallback error', fallbackError)
-            alert(`Could not log dose: ${fallbackError.message}`)
-            return
-          }
-
-          setShowModal(false)
-          router.refresh()
+        if (updateError) {
+          console.error('[ManualLogButton] update error', updateError)
+          alert(`Could not log dose: ${updateError.message}`)
           return
         }
 
