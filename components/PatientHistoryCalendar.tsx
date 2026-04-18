@@ -28,6 +28,23 @@ function formatTime(time: string): string {
   return `${displayHour}:${minute} ${ampm}`
 }
 
+function timeStrInTz(iso: string, timezone: string): string | null {
+  try {
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: timezone,
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    }).formatToParts(new Date(iso))
+    const h = parts.find(p => p.type === 'hour')?.value
+    const m = parts.find(p => p.type === 'minute')?.value
+    if (!h || !m) return null
+    return `${h === '24' ? '00' : h}:${m}`
+  } catch {
+    return null
+  }
+}
+
 function monthKeyToDate(key: string): Date {
   const [y, m] = key.split('-').map(Number)
   return new Date(y, (m || 1) - 1, 1)
@@ -119,9 +136,12 @@ export default function PatientHistoryCalendar({
         if (!log) continue
 
         if (log.confirmed === true) {
-          lines.push({ text: `${med.name} — ${formatTime(rt)}`, kind: 'taken' })
+          // Show actual time taken (confirmed_at) when available
+          const takenAtRaw = log.confirmed_at ? timeStrInTz(log.confirmed_at, timezone) : null
+          const takenAt = takenAtRaw ? formatTime(takenAtRaw) : null
+          lines.push({ text: `${med.name} — ${takenAt ? takenAt : formatTime(rt)} ✅`, kind: 'taken' })
         } else if (log.confirmed === false) {
-          lines.push({ text: `${med.name} — missed`, kind: 'missed' })
+          lines.push({ text: `${med.name} — MISSED ❌`, kind: 'missed' })
         } else {
           lines.push({ text: `${med.name} — ${formatTime(rt)}`, kind: 'pending' })
         }
