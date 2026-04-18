@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 import { Medication, DoseLog, PatientAlert, Patient } from '@/lib/types'
 import ManualLogButton from '@/components/ManualLogButton'
+import LogDoseButton from '@/components/LogDoseButton'
 import DeleteMedButton from '@/components/DeleteMedButton'
 import ArchiveMedButton from '@/components/ArchiveMedButton'
 import DeleteDoctorButton from '@/components/DeleteDoctorButton'
@@ -427,12 +428,19 @@ export default function PatientTabs({
                                     {slotStatusConfig.label}
                                   </span>
                                 )}
-                                {slotStatus === 'missed' && (
+                                {slotStatus === 'missed' ? (
                                   <ManualLogButton
                                     medicationId={med.id}
                                     patientId={patient.id}
                                     medicationName={med.name}
                                     scheduledTime={rt}
+                                    patientTimezone={patient.timezone}
+                                  />
+                                ) : (
+                                  <LogDoseButton
+                                    medicationId={med.id}
+                                    patientId={patient.id}
+                                    reminderTime={rt}
                                     patientTimezone={patient.timezone}
                                   />
                                 )}
