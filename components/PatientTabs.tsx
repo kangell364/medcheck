@@ -185,26 +185,34 @@ export default function PatientTabs({
   }
 
   // Find the dose_log for a specific med + reminder_time slot
+  // Important: if both a missed log and a confirmed log exist for the same slot/day,
+  // always prefer the confirmed one (especially manual confirmations).
   function getSlotLog(medId: string, reminderTime: string): DoseLog | undefined {
     const med = medications.find(m => m.id === medId)
     if (!med) return undefined
-    // Check optimistic snooze — doesn't apply per-slot directly, use first slot
-    // Look for a log where scheduled_at matches the reminder_time within 90 min tolerance
+
     const [rh, rm] = reminderTime.split(':').map(Number)
     const rtMins = rh * 60 + rm
-    let best: DoseLog | undefined
-    let bestDiff = Infinity
+
+    const candidates: { log: DoseLog; diff: number }[] = []
     for (const log of todayLogs) {
       if (log.medication_id !== medId) continue
       const lt = getLogTimeInTz(log.scheduled_at)
       const [lh, lm] = lt.split(':').map(Number)
       const diff = Math.abs(lh * 60 + lm - rtMins)
-      if (diff < bestDiff && diff <= 90) {
-        bestDiff = diff
-        best = log
-      }
+      if (diff <= 90) candidates.push({ log, diff })
     }
-    return best
+
+    if (candidates.length === 0) return undefined
+
+    const confirmed = candidates.filter(c => c.log.confirmed === true)
+    const pool = confirmed.length ? confirmed : candidates
+
+    const manualConfirmed = pool.filter(c => c.log.confirmed === true && c.log.method === 'manual')
+    const pool2 = manualConfirmed.length ? manualConfirmed : pool
+
+    pool2.sort((a, b) => a.diff - b.diff)
+    return pool2[0].log
   }
 
   // Slot status: confirmed | missed | skipped | snoozed | pending
