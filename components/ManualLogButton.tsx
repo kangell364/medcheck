@@ -43,14 +43,16 @@ export default function ManualLogButton({
       const scheduledAt = `${dateStr}T${takenTime}:00`
       const now = new Date().toISOString()
 
-      const { data: existing, error: existingError } = await supabase
-         .from('dose_logs')
-         .select('id')
-         .eq('patient_id', patientId)
-         .eq('medication_id', medicationId)
-         .gte('scheduled_at', `${dateStr}T00:00:00`)
-         .lte('scheduled_at', `${dateStr}T23:59:59`)
-         .maybeSingle()
+      const { data: existingRows, error: existingError } = await supabase
+        .from('dose_logs')
+        .select('id')
+        .eq('patient_id', patientId)
+        .eq('medication_id', medicationId)
+        .gte('scheduled_at', `${dateStr}T00:00:00`)
+        .lte('scheduled_at', `${dateStr}T23:59:59`)
+        .order('scheduled_at', { ascending: false })
+
+      const existing = (existingRows && existingRows.length > 0) ? existingRows[0] : null
 
       if (existingError) {
         console.error('[ManualLogButton] lookup error', existingError)
