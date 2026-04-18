@@ -425,18 +425,94 @@ export default function TermsPage() {
           </section>
 
           <section>
-            <h2 className="text-xl font-bold text-gray-900 mb-3">12. Governing Law &amp; Dispute Resolution</h2>
-            <p className="text-sm mb-3">
-              These Terms shall be governed by and construed in accordance with the laws of the
-              State of Texas, without regard to its conflict of law provisions. Any dispute arising
-              out of or relating to these Terms or the Service shall be resolved exclusively through
-              binding arbitration in Harris County, Texas, under the rules of the American Arbitration
-              Association, except that either party may seek injunctive or other equitable relief in
-              any court of competent jurisdiction.
-            </p>
+            <h2 className="text-xl font-bold text-gray-900 mb-3">12. Governing Law</h2>
             <p className="text-sm">
-              <strong>YOU WAIVE YOUR RIGHT TO A JURY TRIAL AND TO PARTICIPATE IN ANY CLASS ACTION
-              LAWSUIT OR CLASS-WIDE ARBITRATION.</strong>
+              These Terms shall be governed by and construed in accordance with the laws of the State
+              of Texas, without regard to its conflict of law provisions.
+            </p>
+          </section>
+
+          <section>
+            <h2 className="text-xl font-bold text-gray-900 mb-3">13. Arbitration &amp; Class Action Waiver</h2>
+
+            <p className="text-sm mb-3">
+              <strong>Please read this section carefully.</strong> It affects your rights.
+              Lendpromise (including its services and products, including RxNudge) and you agree that
+              most disputes must be resolved by <strong>binding, individual arbitration</strong> and not
+              in court.
+            </p>
+
+            <p className="text-sm mb-3">
+              <strong>Informal Resolution First.</strong> Before starting arbitration, you agree to
+              try to resolve the dispute informally by emailing{' '}
+              <a href="mailto:legal@rxnudge.app" className="text-teal-600 hover:underline">legal@rxnudge.app</a>{' '}
+              with (a) your name, (b) the email/phone associated with your account, (c) a brief
+              description of the dispute, and (d) the relief you are seeking. We will try to resolve
+              the dispute informally within 30 days.
+            </p>
+
+            <p className="text-sm mb-3">
+              <strong>Agreement to Arbitrate.</strong> If the dispute is not resolved informally, you
+              and Lendpromise agree to resolve any dispute, claim, or controversy arising out of or
+              relating to these Terms or the Service ("Dispute") by binding arbitration administered
+              by the American Arbitration Association (AAA) under its Consumer Arbitration Rules.
+              The arbitration will be conducted in <strong>Harris County, Texas</strong>, unless the
+              parties agree otherwise.
+            </p>
+
+            <p className="text-sm mb-3">
+              <strong>Small Claims Court.</strong> Either party may bring an individual action in small
+              claims court instead of arbitration, as long as the claim remains in small claims court
+              and proceeds only on an individual basis.
+            </p>
+
+            <p className="text-sm mb-3">
+              <strong>Injunctive Relief / IP.</strong> Nothing in this section prevents either party
+              from seeking injunctive or other equitable relief in a court of competent jurisdiction
+              to prevent the actual or threatened infringement, misappropriation, or violation of a
+              party’s intellectual property rights.
+            </p>
+
+            <p className="text-sm mb-3">
+              <strong>Fees.</strong> Payment of arbitration filing, administration, and arbitrator fees
+              will be governed by the AAA rules.
+            </p>
+
+            <p className="text-sm mb-3">
+              <strong>Class Action Waiver.</strong> <strong>YOU AND LENDPROMISE AGREE THAT EACH MAY BRING
+              CLAIMS AGAINST THE OTHER ONLY IN YOUR OR ITS INDIVIDUAL CAPACITY, AND NOT AS A PLAINTIFF
+              OR CLASS MEMBER IN ANY PURPORTED CLASS, COLLECTIVE, OR REPRESENTATIVE PROCEEDING.</strong>
+              The arbitrator may not consolidate more than one person’s claims and may not otherwise
+              preside over any form of a class, collective, or representative proceeding.
+            </p>
+
+            <p className="text-sm">
+              <strong>Jury Trial Waiver.</strong> <strong>YOU WAIVE YOUR RIGHT TO A JURY TRIAL.</strong>
+            </p>
+          </section>
+
+          <section>
+            <h2 className="text-xl font-bold text-gray-900 mb-3">14. Changes to Terms</h2>
+            <p className="text-sm">
+              We reserve the right to modify these Terms at any time. We will notify registered users
+              of material changes via email or in-app notice. Your continued use of the Service after
+              any such changes constitutes your acceptance of the new Terms. If you do not agree with
+              the updated Terms, you must stop using the Service.
+            </p>
+          </section>
+
+          <section>
+            <h2 className="text-xl font-bold text-gray-900 mb-3">15. Contact</h2>
+            <p className="text-sm">
+              For questions about these Terms, contact us at:{' '}
+              <a href="mailto:legal@rxnudge.app" className="text-teal-600 hover:underline">
+                legal@rxnudge.app
+              </a>
+              <br />
+              For SMS support, reply <strong>HELP</strong> to any message or email:{' '}
+              <a href="mailto:support@rxnudge.app" className="text-teal-600 hover:underline">
+                support@rxnudge.app
+              </a>
             </p>
           </section>
 
