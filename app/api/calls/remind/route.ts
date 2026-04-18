@@ -37,13 +37,11 @@ export async function POST(request: NextRequest) {
       process.env.TWILIO_AUTH_TOKEN!
     )
 
-    const medListEncoded = encodeURIComponent(JSON.stringify(medList || []))
-
+    // Use Gather-based TwiML (works on Vercel). The older Media Stream realtime bridge
+    // requires WebSockets and is not reliable in this deployment.
     const twimlUrl =
-      `${appUrl}/api/calls/remind/twiml` +
-      `?escalationId=${encodeURIComponent(escalationId)}` +
-      `&patientName=${encodeURIComponent(patientName)}` +
-      `&medList=${medListEncoded}`
+      `${appUrl}/api/calls/remind/twiml-gather` +
+      `?escalationId=${encodeURIComponent(escalationId)}`
 
     const call = await client.calls.create({
       to: patientPhone,
