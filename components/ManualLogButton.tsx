@@ -157,7 +157,7 @@ export default function ManualLogButton({
         onClick={() => setShowModal(true)}
         className="text-xs font-semibold text-teal-600 hover:text-teal-700 border border-teal-300 px-2.5 py-1 rounded-full hover:bg-teal-50 transition-colors"
       >
-        📝 Log Anyway
+        🕒 Log Time
       </button>
 
       {showModal && (

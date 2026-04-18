@@ -442,7 +442,7 @@ export default function PatientTabs({
                                     scheduledTime={rt}
                                     patientTimezone={patient.timezone}
                                   />
-                                ) : (
+                                ) : slotStatus === 'confirmed' ? null : (
                                   <LogDoseButton
                                     medicationId={med.id}
                                     patientId={patient.id}
