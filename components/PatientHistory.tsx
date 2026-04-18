@@ -179,18 +179,53 @@ export default function PatientHistory({
   const dayDateStrs = days.map(d => dateStrInTz(d, timezone))
   const todayStr = todayLocalStr()
 
-  // Calendar month paging (month view)
+  // Month helpers
   function monthKey(d: Date): string {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
   }
 
-  const [visibleMonth, setVisibleMonth] = useState<string>(() => monthKey(end))
+  function monthKeyToDate(key: string): Date {
+    const [y, m] = key.split('-').map(Number)
+    return new Date(y, (m || 1) - 1, 1)
+  }
 
-  // Keep visible month within the selected range
-  useEffect(() => {
-    const endKey = monthKey(end)
-    if (visibleMonth > endKey) setVisibleMonth(endKey)
-  }, [end, visibleMonth])
+  function addMonthsKey(key: string, delta: number): string {
+    const d = monthKeyToDate(key)
+    d.setMonth(d.getMonth() + delta)
+    return monthKey(d)
+  }
+
+  function buildMonthKeys(startDate: Date, endDate: Date): string[] {
+    const startKey = monthKey(new Date(startDate.getFullYear(), startDate.getMonth(), 1))
+    const endKey = monthKey(new Date(endDate.getFullYear(), endDate.getMonth(), 1))
+
+    const out: string[] = []
+    let cur = startKey
+    // safety cap at 12 months
+    for (let i = 0; i < 12; i++) {
+      out.push(cur)
+      if (cur === endKey) break
+      cur = addMonthsKey(cur, 1)
+    }
+    return out
+  }
+
+  // Determine which months to render based on the range selection
+  const monthsToRender = (() => {
+    if (dateRange === '30d') {
+      // current month
+      return [monthKey(new Date())]
+    }
+
+    if (dateRange === '60d') {
+      // current month + following month
+      const cur = monthKey(new Date())
+      return [cur, addMonthsKey(cur, 1)]
+    }
+
+    // custom: show all months in requested range (up to 12)
+    return buildMonthKeys(start, end)
+  })()
 
   // Build slot map: slotMap[medId][reminderTime][dateStr] = DoseLog
   const slotMap: Record<string, Record<string, Record<string, DoseLog>>> = {}
@@ -361,46 +396,22 @@ export default function PatientHistory({
 
       {/* Calendar month view */}
       {!loading && medications.length > 0 && (
-        dateRange === '60d' ? (
-          <div className="space-y-4">
+        <div className="space-y-4">
+          {monthsToRender.map((m, idx) => (
             <PatientHistoryCalendar
+              key={`${m}-${idx}`}
               timezone={timezone}
               start={start}
               end={end}
-              visibleMonth={visibleMonth}
-              setVisibleMonth={setVisibleMonth}
-              medications={medications}
-              doseLogs={doseLogs}
-              slotMap={slotMap}
-            />
-            <PatientHistoryCalendar
-              timezone={timezone}
-              start={start}
-              end={end}
-              visibleMonth={(() => {
-                const [y, m] = visibleMonth.split('-').map(Number)
-                const d = new Date(y, (m || 1) - 1, 1)
-                d.setMonth(d.getMonth() + 1)
-                return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
-              })()}
+              visibleMonth={m}
+              // Month paging will be handled later (for now this is a fixed multi-month view)
               setVisibleMonth={() => {}}
               medications={medications}
               doseLogs={doseLogs}
               slotMap={slotMap}
             />
-          </div>
-        ) : (
-          <PatientHistoryCalendar
-            timezone={timezone}
-            start={start}
-            end={end}
-            visibleMonth={visibleMonth}
-            setVisibleMonth={setVisibleMonth}
-            medications={medications}
-            doseLogs={doseLogs}
-            slotMap={slotMap}
-          />
-        )
+          ))}
+        </div>
       )}
     </div>
   )
