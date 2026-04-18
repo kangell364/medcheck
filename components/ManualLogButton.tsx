@@ -70,21 +70,13 @@ export default function ManualLogButton({
           .from('dose_logs')
           .update({
             confirmed: true,
-            confirmed_at: now,
-            method: 'manual',
-            // Keep scheduled_at as the scheduled slot; record actual time in confirmed_at.
-            // (We don't currently have a separate taken_at column.)
+            // Record the chosen actual time in confirmed_at.
             confirmed_at: new Date(`${dateStr}T${takenTime}:00`).toISOString(),
+            method: 'manual',
           })
           .eq('patient_id', patientId)
           .eq('medication_id', medicationId)
           .eq('scheduled_at', scheduledSlot)
-
-        if (updateError) {
-          console.error('[ManualLogButton] update error', updateError)
-          alert(`Could not log dose: ${updateError.message}`)
-          return
-        }
 
         if (updateError) {
           console.error('[ManualLogButton] update error', updateError)
