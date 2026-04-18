@@ -414,24 +414,26 @@ export default function PatientTabs({
 
                           return (
                             <div key={rt} className={`flex items-center justify-between rounded-xl border p-3 ${slotStatusConfig.class}`}>
+                              {/* Scheduled (left column) */}
                               <div className="flex items-center gap-2">
-                                {slotStatusConfig.icon && <span className="text-base">{slotStatusConfig.icon}</span>}
                                 <span className="text-sm font-semibold text-gray-700">
                                   {formatTimeInTz(rt, patient.timezone)}
                                 </span>
-                                {slotStatus === 'confirmed' && slotLog?.confirmed_at && (
-                                  <span className="text-xs text-gray-400">
-                                    at {formatIsoInTz(slotLog.confirmed_at, patient.timezone)}
-                                    {slotLog.method && ` via ${slotLog.method}`}
-                                  </span>
-                                )}
                               </div>
-                              <div className="flex items-center gap-2">
-                                {slotStatusConfig.label && (
-                                  <span className={`text-xs font-semibold px-2 py-0.5 rounded-full border ${slotStatusConfig.class}`}>
-                                    {slotStatusConfig.label}
+
+                              {/* Logged (right column) */}
+                              <div className="flex items-center justify-end gap-2 text-right">
+                                {slotStatus === 'confirmed' && slotLog?.confirmed_at ? (
+                                  <span className="text-xs text-gray-500">
+                                    {formatIsoInTz(slotLog.confirmed_at, patient.timezone)}
+                                    {slotLog.method && <span className="text-gray-400"> via {slotLog.method}</span>}
                                   </span>
+                                ) : slotStatus === 'missed' ? (
+                                  <span className="text-xs font-semibold text-red-700">Missed</span>
+                                ) : (
+                                  <span className="text-xs text-gray-400">—</span>
                                 )}
+
                                 {slotStatus === 'missed' ? (
                                   <ManualLogButton
                                     medicationId={med.id}
