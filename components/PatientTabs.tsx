@@ -395,6 +395,10 @@ export default function PatientTabs({
                       </div>
 
                       {/* Per-time-slot rows */}
+                      <div className="grid grid-cols-[1fr_auto] gap-2 mb-2 px-1">
+                        <div className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide">Scheduled</div>
+                        <div className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide text-right">Logged</div>
+                      </div>
                       <div className="space-y-2 mb-3">
                         {times.map(rt => {
                           const slotStatus = getSlotStatus(med.id, rt)
