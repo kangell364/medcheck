@@ -219,8 +219,8 @@ export default function PatientTabs({
       const patientNow = new Date(new Date().toLocaleString('en-US', { timeZone: patient.timezone }))
       const currentMins = patientNow.getHours() * 60 + patientNow.getMinutes()
       const slotMins = rh * 60 + rm
-      // If past due by > 30 min and no log, mark as missed
-      if (currentMins > slotMins + 30) return 'missed'
+      // If past due by > 60 min and no log, mark as missed
+      if (currentMins > slotMins + 60) return 'missed'
       return 'pending'
     }
     if (log.snooze_until && new Date(log.snooze_until) > new Date()) return 'snoozed'
