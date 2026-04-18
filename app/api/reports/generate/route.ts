@@ -3,7 +3,8 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { Resend } from 'resend'
 import { Medication, DoseLog, Patient } from '@/lib/types'
 
-const resend = new Resend(process.env.RESEND_API_KEY)
+const resendApiKey = process.env.RESEND_API_KEY
+const resend = resendApiKey ? new Resend(resendApiKey) : null
 
 interface PatientGroup {
   patientId: string
@@ -662,6 +663,10 @@ export async function POST(req: NextRequest) {
     const subject = `Medication Adherence Report — ${patientNames} (${formatDateDisplay(dateFrom)} to ${formatDateDisplay(dateTo)})`
 
     // Send via Resend
+    if (!resend) {
+      return NextResponse.json({ error: 'Email provider not configured' }, { status: 503 })
+    }
+
     const { error: sendError } = await resend.emails.send({
       from: 'RxNudge Reports <onboarding@resend.dev>',
       to: [email],
