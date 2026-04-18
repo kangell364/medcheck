@@ -383,7 +383,7 @@ export default function PatientHistory({
                 d.setMonth(d.getMonth() + 1)
                 return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
               })()}
-              setVisibleMonth={setVisibleMonth}
+              setVisibleMonth={() => {}}
               medications={medications}
               doseLogs={doseLogs}
               slotMap={slotMap}
