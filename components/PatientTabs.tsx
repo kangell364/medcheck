@@ -404,13 +404,13 @@ export default function PatientTabs({
                             missed: { icon: '❌', label: 'Missed', class: 'bg-red-50 border-red-200 text-red-700' },
                             skipped: { icon: '⏭️', label: 'Skipped', class: 'bg-gray-50 border-gray-200 text-gray-500' },
                             snoozed: { icon: '😴', label: 'Snoozed', class: 'bg-amber-50 border-amber-200 text-amber-700' },
-                            pending: { icon: '⏳', label: 'Pending', class: 'bg-white border-gray-100 text-gray-500' },
-                          }[slotStatus] || { icon: '⏳', label: 'Pending', class: 'bg-white border-gray-100 text-gray-500' }
+                            pending: { icon: '', label: '', class: 'bg-white border-gray-100 text-gray-500' },
+                          }[slotStatus] || { icon: '', label: '', class: 'bg-white border-gray-100 text-gray-500' }
 
                           return (
                             <div key={rt} className={`flex items-center justify-between rounded-xl border p-3 ${slotStatusConfig.class}`}>
                               <div className="flex items-center gap-2">
-                                <span className="text-base">{slotStatusConfig.icon}</span>
+                                {slotStatusConfig.icon && <span className="text-base">{slotStatusConfig.icon}</span>}
                                 <span className="text-sm font-semibold text-gray-700">
                                   {formatTimeInTz(rt, patient.timezone)}
                                 </span>
@@ -422,9 +422,11 @@ export default function PatientTabs({
                                 )}
                               </div>
                               <div className="flex items-center gap-2">
-                                <span className={`text-xs font-semibold px-2 py-0.5 rounded-full border ${slotStatusConfig.class}`}>
-                                  {slotStatusConfig.label}
-                                </span>
+                                {slotStatusConfig.label && (
+                                  <span className={`text-xs font-semibold px-2 py-0.5 rounded-full border ${slotStatusConfig.class}`}>
+                                    {slotStatusConfig.label}
+                                  </span>
+                                )}
                                 {slotStatus === 'missed' && (
                                   <ManualLogButton
                                     medicationId={med.id}
