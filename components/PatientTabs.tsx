@@ -189,9 +189,34 @@ export default function PatientTabs({
   // can never change another row.
   function getSlotLog(medId: string, reminderTime: string): DoseLog | undefined {
     const today = new Date().toLocaleDateString('en-CA', { timeZone: patient.timezone })
-    const slot = `${today}T${reminderTime}:00`
+    const slotLocal = `${today}T${reminderTime}:00`
+    const slotMs = new Date(slotLocal).getTime()
 
-    return todayLogs.find(l => l.medication_id === medId && l.scheduled_at === slot)
+    // Match by a small window around the scheduled slot to tolerate timezone formatting.
+    const candidates = todayLogs.filter(l => {
+      if (l.medication_id !== medId) return false
+      const t = new Date(l.scheduled_at).getTime()
+      return Math.abs(t - slotMs) <= 5 * 60 * 1000
+    })
+
+    if (!candidates.length) return undefined
+
+    // Prefer confirmed logs over missed
+    const confirmed = candidates.filter(l => l.confirmed === true)
+    const pool = confirmed.length ? confirmed : candidates
+
+    // Prefer manual confirmations
+    const manual = pool.filter(l => l.confirmed === true && l.method === 'manual')
+    const pool2 = manual.length ? manual : pool
+
+    // Prefer most recent confirmed_at (fallback scheduled_at)
+    pool2.sort((a, b) => {
+      const atA = (a.confirmed_at || a.scheduled_at || '')
+      const atB = (b.confirmed_at || b.scheduled_at || '')
+      return atB.localeCompare(atA)
+    })
+
+    return pool2[0]
   }
 
   // Slot status: confirmed | missed | skipped | snoozed | pending

@@ -83,6 +83,8 @@ export default function ManualLogButton({
           alert(`Could not log dose: ${updateError.message}`)
           return
         }
+
+        alert(`Saved ${takenTime} for the ${scheduledTime} dose.`)
       } else {
         const { error: insertError } = await supabase.from('dose_logs').insert({
           patient_id: patientId,
