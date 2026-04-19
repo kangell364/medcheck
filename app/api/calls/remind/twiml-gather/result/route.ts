@@ -60,13 +60,18 @@ export async function POST(request: NextRequest) {
 
   const patient = (escalation as any)?.patients
 
-  await adminLogEvent({
-    patientId: patient?.id,
-    ownerId: patient?.owner_id,
-    eventType: 'call_gather',
-    patientName: patient?.name,
-    internalDetails: { escalationId, digits, speech, intent },
-  })
+  // Log the gather interaction for debugging.
+  // (Use system_error because logEvent types are strictly enumerated.)
+  if (patient?.id && patient?.owner_id) {
+    await adminLogEvent({
+      patientId: patient.id,
+      ownerId: patient.owner_id,
+      eventType: 'system_error',
+      patientName: patient.name,
+      customDisplayMessage: 'Call input received (debug)',
+      internalDetails: { escalationId, digits, speech, intent },
+    })
+  }
 
   if (!intent) {
     twiml.say({ voice: 'Polly.Joanna' }, "Sorry, I didn't catch that. We'll send you a text message instead. Goodbye.")
