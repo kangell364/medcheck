@@ -71,6 +71,7 @@ export default function ManualLogButton({
 
       alert(`Saved ${takenTime} for the ${scheduledTime} dose.`)
 
+      // Close modal first so the refreshed UI is visible immediately.
       setShowModal(false)
       router.refresh()
     } finally {
