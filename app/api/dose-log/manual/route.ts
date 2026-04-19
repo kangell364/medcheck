@@ -71,6 +71,33 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: upsertError.message }, { status: 500 })
     }
 
+    // Cleanup legacy "wrong timezone" rows created before we converted local->UTC properly.
+    // If there are other rows for the same patient+med near this time but with a different scheduled_at,
+    // they can cause the UI to flip between entries.
+    try {
+      const slotMs = new Date(scheduledSlotIso).getTime()
+      const winStart = new Date(slotMs - 8 * 60 * 60 * 1000).toISOString()
+      const winEnd = new Date(slotMs + 8 * 60 * 60 * 1000).toISOString()
+
+      const { data: nearby } = await supabase
+        .from('dose_logs')
+        .select('id, scheduled_at')
+        .eq('patient_id', patientId)
+        .eq('medication_id', medicationId)
+        .gte('scheduled_at', winStart)
+        .lte('scheduled_at', winEnd)
+
+      const badIds = (nearby || [])
+        .filter(r => r.scheduled_at !== scheduledSlotIso)
+        .map(r => r.id)
+
+      if (badIds.length) {
+        await supabase.from('dose_logs').delete().in('id', badIds)
+      }
+    } catch {
+      // best-effort cleanup only
+    }
+
     return NextResponse.json({ ok: true, scheduled_at: scheduledSlotIso, confirmed_at: takenAtIso })
   } catch (err: unknown) {
     return NextResponse.json({ error: err instanceof Error ? err.message : String(err) }, { status: 500 })
