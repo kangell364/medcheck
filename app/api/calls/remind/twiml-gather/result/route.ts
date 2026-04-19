@@ -50,7 +50,8 @@ export async function POST(request: NextRequest) {
 
   const intent = normIntent(digits, speech)
 
-  const VOICE = process.env.TWILIO_VOICE || 'Polly.Joanna'
+  // Twilio's type definitions restrict voice to a narrow union; runtime accepts more.
+  const VOICE = (process.env.TWILIO_VOICE || 'Polly.Joanna') as any
 
   if (!escalationId) {
     twiml.say({ voice: VOICE }, 'Sorry, there was an error. Goodbye.')

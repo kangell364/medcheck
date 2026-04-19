@@ -52,7 +52,8 @@ function handler(request: NextRequest): NextResponse {
   })
 
   // Speech-first, keypad secondary.
-  const VOICE = process.env.TWILIO_VOICE || 'Polly.Joanna'
+  // Twilio's type definitions restrict voice to a narrow union; runtime accepts more.
+  const VOICE = (process.env.TWILIO_VOICE || 'Polly.Joanna') as any
 
   gather.say(
     { voice: VOICE },
