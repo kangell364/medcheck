@@ -40,103 +40,36 @@ export default function ManualLogButton({
     setSaving(true)
     try {
       const dateStr = new Date().toLocaleDateString('en-CA', { timeZone: patientTimezone })
-      const scheduledAt = `${dateStr}T${takenTime}:00`
-      const now = new Date().toISOString()
       const takenAtIso = new Date(`${dateStr}T${takenTime}:00`).toISOString()
+
+      // Always anchor the log to the scheduled slot time (never the taken time).
+      // This guarantees the UI/calendar slot flips from MISSED → CONFIRMED for that dose.
       const scheduledSlotLocal = `${dateStr}T${scheduledTime}:00`
       const scheduledSlotIso = new Date(scheduledSlotLocal).toISOString()
 
-      // Find the exact scheduled slot row for today (tolerate timezone formatting differences)
-      const windowStart = new Date(new Date(scheduledSlotLocal).getTime() - 5 * 60 * 1000).toISOString()
-      const windowEnd = new Date(new Date(scheduledSlotLocal).getTime() + 5 * 60 * 1000).toISOString()
-
-      const { data: slotRow, error: existingError } = await supabase
+      // Upsert the unique row (patient_id, medication_id, scheduled_at)
+      const { error: upsertError } = await supabase
         .from('dose_logs')
-        .select('id')
-        .eq('patient_id', patientId)
-        .eq('medication_id', medicationId)
-        .gte('scheduled_at', windowStart)
-        .lte('scheduled_at', windowEnd)
-        .maybeSingle()
-
-      const pickedId = slotRow?.id ?? null
-
-      if (existingError) {
-        console.error('[ManualLogButton] lookup error', existingError)
-        alert(`Could not log dose: ${existingError.message}`)
-        return
-      }
-
-
-      if (pickedId) {
-        const { error: updateError } = await supabase
-          .from('dose_logs')
-          .update({
+        .upsert(
+          {
+            patient_id: patientId,
+            medication_id: medicationId,
+            medication_name: medicationName,
+            scheduled_at: scheduledSlotIso,
             confirmed: true,
             confirmed_at: takenAtIso,
             method: 'manual',
-          })
-          .eq('id', pickedId)
+          },
+          { onConflict: 'patient_id,medication_id,scheduled_at' }
+        )
 
-        if (updateError) {
-          console.error('[ManualLogButton] update error', updateError)
-          alert(`Could not log dose: ${updateError.message}`)
-          return
-        }
-
-        alert(`Saved ${takenTime} for the ${scheduledTime} dose.`)
-      } else {
-        const { error: insertError } = await supabase.from('dose_logs').insert({
-          patient_id: patientId,
-          medication_id: medicationId,
-          medication_name: medicationName,
-          scheduled_at: scheduledSlotIso,
-          confirmed: true,
-          confirmed_at: takenAtIso,
-          method: 'manual',
-        })
-
-        // If a row already exists for that exact scheduled_at, just update that row instead.
-        if (insertError && /duplicate key value violates unique constraint/i.test(insertError.message)) {
-          const { data: existingExact, error: exactErr } = await supabase
-            .from('dose_logs')
-            .select('id')
-            .eq('patient_id', patientId)
-            .eq('medication_id', medicationId)
-            .eq('scheduled_at', scheduledSlotIso)
-            .maybeSingle()
-
-          if (exactErr) {
-            console.error('[ManualLogButton] exact lookup error', exactErr)
-            alert(`Could not log dose: ${exactErr.message}`)
-            return
-          }
-
-          if (existingExact?.id) {
-            const { error: exactUpdateErr } = await supabase.from('dose_logs').update({
-              confirmed: true,
-              confirmed_at: takenAtIso,
-              method: 'manual',
-            }).eq('id', existingExact.id)
-
-            if (exactUpdateErr) {
-              console.error('[ManualLogButton] exact update error', exactUpdateErr)
-              alert(`Could not log dose: ${exactUpdateErr.message}`)
-              return
-            }
-
-            setShowModal(false)
-            router.refresh()
-            return
-          }
-        }
-
-        if (insertError) {
-          console.error('[ManualLogButton] insert error', insertError)
-          alert(`Could not log dose: ${insertError.message}`)
-          return
-        }
+      if (upsertError) {
+        console.error('[ManualLogButton] upsert error', upsertError)
+        alert(`Could not log dose: ${upsertError.message}`)
+        return
       }
+
+      alert(`Saved ${takenTime} for the ${scheduledTime} dose.`)
 
       setShowModal(false)
       router.refresh()
