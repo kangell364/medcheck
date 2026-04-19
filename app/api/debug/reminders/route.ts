@@ -39,6 +39,21 @@ export async function GET(request: NextRequest) {
     .eq('escalation_date', date)
     .order('created_at', { ascending: true })
 
+  // Pull dose logs for that date (in the patient's timezone day window)
+  const tz = (patient as any).timezone || 'America/Chicago'
+  const startLocal = new Date(`${date}T00:00:00`)
+  const endLocal = new Date(`${date}T23:59:59`)
+
+  // NOTE: JS Date has no native tz construction; we use ISO bounds in UTC for approximate debug,
+  // and also return raw rows so we can inspect scheduled_at/confirmed_at.
+  const { data: doseLogs } = await supabase
+    .from('dose_logs')
+    .select('id, medication_id, scheduled_at, confirmed, confirmed_at, method, created_at, updated_at')
+    .eq('patient_id', patientId)
+    .gte('scheduled_at', `${date}T00:00:00.000Z`)
+    .lte('scheduled_at', `${date}T23:59:59.999Z`)
+    .order('scheduled_at', { ascending: true })
+
   // Pull recent alert_log/admin events if available
   const { data: events } = await supabase
     .from('alert_log')
@@ -51,8 +66,10 @@ export async function GET(request: NextRequest) {
 
   return NextResponse.json({
     date,
+    timezone: tz,
     patient,
     escalations: escalations || [],
+    doseLogs: doseLogs || [],
     events: events || [],
   })
 }
