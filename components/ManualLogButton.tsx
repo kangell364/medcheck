@@ -20,7 +20,34 @@ export default function ManualLogButton({
   patientTimezone,
 }: Props) {
   const [showModal, setShowModal] = useState(false)
+  // Store taken time internally as 24h HH:MM.
   const [takenTime, setTakenTime] = useState(scheduledTime)
+
+  function to12h(hhmm: string): string {
+    const [hStr, mStr] = hhmm.split(':')
+    const h = parseInt(hStr || '0', 10)
+    const m = parseInt(mStr || '0', 10)
+    const ampm = h >= 12 ? 'PM' : 'AM'
+    const h12 = ((h + 11) % 12) + 1
+    const mm = String(m).padStart(2, '0')
+    return `${h12}:${mm} ${ampm}`
+  }
+
+  function from12h(hour12: number, minute: number, ampm: 'AM' | 'PM'): string {
+    const h = ampm === 'PM' ? (hour12 % 12) + 12 : (hour12 % 12)
+    const hh = String(h).padStart(2, '0')
+    const mm = String(minute).padStart(2, '0')
+    return `${hh}:${mm}`
+  }
+
+  function toPicker(hhmm: string): { hour12: number; minute: number; ampm: 'AM' | 'PM' } {
+    const [hStr, mStr] = hhmm.split(':')
+    const h = parseInt(hStr || '0', 10)
+    const minute = parseInt(mStr || '0', 10)
+    const ampm: 'AM' | 'PM' = h >= 12 ? 'PM' : 'AM'
+    const hour12 = ((h + 11) % 12) + 1
+    return { hour12, minute, ampm }
+  }
   const [saving, setSaving] = useState(false)
   const router = useRouter()
   // We log manually via a server route (service role) to avoid client-side RLS/auth issues.
@@ -60,7 +87,7 @@ export default function ManualLogButton({
         return
       }
 
-      alert(`Saved ${takenTime} for the ${scheduledTime} dose.`)
+      alert(`Saved ${to12h(takenTime)} for the ${to12h(scheduledTime)} dose.`)
       setShowModal(false)
       router.refresh()
     } finally {
@@ -85,12 +112,47 @@ export default function ManualLogButton({
               What time did <span className="font-semibold text-gray-700">{medicationName}</span> actually get taken?
             </p>
             <label className="block text-sm font-medium text-gray-700 mb-2">Time taken</label>
-            <input
-              type="time"
-              value={takenTime}
-              onChange={e => setTakenTime(e.target.value)}
-              className="w-full px-4 py-3 rounded-xl border border-gray-200 text-xl focus:outline-none focus:ring-2 focus:ring-teal-500 mb-5"
-            />
+
+            {/* 12-hour picker (avoids device-specific 24h time input rendering) */}
+            {(() => {
+              const p = toPicker(takenTime)
+              const minuteOptions = [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55]
+              return (
+                <div className="w-full rounded-xl border border-gray-200 p-4 mb-5">
+                  <div className="text-3xl font-bold text-gray-900 mb-3">{to12h(takenTime)}</div>
+                  <div className="flex gap-3">
+                    <select
+                      value={p.hour12}
+                      onChange={e => setTakenTime(from12h(parseInt(e.target.value, 10), p.minute, p.ampm))}
+                      className="flex-1 px-3 py-3 rounded-xl border border-gray-200 text-lg"
+                    >
+                      {Array.from({ length: 12 }, (_, i) => i + 1).map(h => (
+                        <option key={h} value={h}>{h}</option>
+                      ))}
+                    </select>
+
+                    <select
+                      value={p.minute}
+                      onChange={e => setTakenTime(from12h(p.hour12, parseInt(e.target.value, 10), p.ampm))}
+                      className="flex-1 px-3 py-3 rounded-xl border border-gray-200 text-lg"
+                    >
+                      {minuteOptions.map(m => (
+                        <option key={m} value={m}>{String(m).padStart(2, '0')}</option>
+                      ))}
+                    </select>
+
+                    <select
+                      value={p.ampm}
+                      onChange={e => setTakenTime(from12h(p.hour12, p.minute, e.target.value as 'AM' | 'PM'))}
+                      className="flex-1 px-3 py-3 rounded-xl border border-gray-200 text-lg"
+                    >
+                      <option value="AM">AM</option>
+                      <option value="PM">PM</option>
+                    </select>
+                  </div>
+                </div>
+              )
+            })()}
             <div className="flex gap-3">
               <button
                 onClick={handleSave}
