@@ -23,6 +23,8 @@ export default function ManualLogButton({
   const [takenTime, setTakenTime] = useState(scheduledTime)
   const [saving, setSaving] = useState(false)
   const router = useRouter()
+  // We log manually via a server route (service role) to avoid client-side RLS/auth issues.
+  // (Keep supabase client import for other components; not used here.)
   const supabase = (() => {
     try {
       return createClient()
@@ -39,39 +41,26 @@ export default function ManualLogButton({
 
     setSaving(true)
     try {
-      const dateStr = new Date().toLocaleDateString('en-CA', { timeZone: patientTimezone })
-      const takenAtIso = new Date(`${dateStr}T${takenTime}:00`).toISOString()
+      const res = await fetch('/api/dose-log/manual', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          patientId,
+          medicationId,
+          medicationName,
+          scheduledTime,
+          takenTime,
+          patientTimezone,
+        }),
+      })
 
-      // Always anchor the log to the scheduled slot time (never the taken time).
-      // This guarantees the UI/calendar slot flips from MISSED → CONFIRMED for that dose.
-      const scheduledSlotLocal = `${dateStr}T${scheduledTime}:00`
-      const scheduledSlotIso = new Date(scheduledSlotLocal).toISOString()
-
-      // Upsert the unique row (patient_id, medication_id, scheduled_at)
-      const { error: upsertError } = await supabase
-        .from('dose_logs')
-        .upsert(
-          {
-            patient_id: patientId,
-            medication_id: medicationId,
-            medication_name: medicationName,
-            scheduled_at: scheduledSlotIso,
-            confirmed: true,
-            confirmed_at: takenAtIso,
-            method: 'manual',
-          },
-          { onConflict: 'patient_id,medication_id,scheduled_at' }
-        )
-
-      if (upsertError) {
-        console.error('[ManualLogButton] upsert error', upsertError)
-        alert(`Could not log dose: ${upsertError.message}`)
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        alert(`Could not log dose: ${json?.error || res.statusText}`)
         return
       }
 
       alert(`Saved ${takenTime} for the ${scheduledTime} dose.`)
-
-      // Close modal first so the refreshed UI is visible immediately.
       setShowModal(false)
       router.refresh()
     } finally {
