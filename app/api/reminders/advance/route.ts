@@ -26,6 +26,36 @@ import {
 import { getTimezoneForState } from '@/lib/stateTimezone'
 
 const STEP_WAIT_MS = 30 * 60 * 1000 // 30 minutes
+const FINALIZE_MISSED_MINUTES = 120 // 2 hours past scheduled slot
+
+function parseTime(t: string): { hours: number; minutes: number } {
+  const [h, m] = t.split(':').map(Number)
+  return { hours: h, minutes: m }
+}
+
+function localMinutesNow(timezone: string): number {
+  const now = new Date()
+  const localStr = now.toLocaleTimeString('en-US', {
+    timeZone: timezone,
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  })
+  const [lh, lm] = localStr.split(':').map(Number)
+  return lh * 60 + lm
+}
+
+function minutesPastSlot(timeSlot: string | null | undefined, timezone: string): number | null {
+  if (!timeSlot || timeSlot === 'unknown' || timeSlot === 'test') return null
+  const { hours, minutes } = parseTime(timeSlot)
+  const targetMins = hours * 60 + minutes
+  const nowMins = localMinutesNow(timezone)
+  let diff = nowMins - targetMins
+  // If negative, slot is in the future (or crossed midnight). For our reminder slots,
+  // treat negative as not yet due.
+  if (diff < 0) return diff
+  return diff
+}
 
 function minutesAgo(dateStr: string): number {
   return (Date.now() - new Date(dateStr).getTime()) / 60000
@@ -203,45 +233,89 @@ async function advanceEscalation(
     return { advanced: true }
   }
 
-  // ── STEP 5 → 6: mark missed + caregiver alert ─────────────────
-  if (status === 'pending' && step === 5) {
-    if (minutesAgo(updatedAt) < 30) return { advanced: false, reason: 'too_soon' }
+  // ── Finalize missed (2 hours past scheduled slot) ──────────────
+  // We want the Alert Log "Missed Doses" tab to reflect reality, so we write:
+  // - reminder_escalations.status='missed'
+  // - dose_logs confirmed=false per med line
+  // - alert_log eventType='missed_dose'
+  if (status === 'pending') {
+    const minsPast = minutesPastSlot(escalation.time_slot as string, ctx.timezone)
+    if (minsPast !== null && minsPast >= FINALIZE_MISSED_MINUTES) {
+      await supabase
+        .from('reminder_escalations')
+        .update({ step: 6, status: 'missed', caregiver_alerted: true })
+        .eq('id', escalationId)
 
-    await supabase
-      .from('reminder_escalations')
-      .update({ step: 6, status: 'missed', caregiver_alerted: true })
-      .eq('id', escalationId)
+      // Write missed dose_logs for each medication_id at the scheduled slot time.
+      // (This makes history/calendar + alert log consistent.)
+      const date = escalation.escalation_date as string
+      const scheduledAtIso = new Date(`${date}T${String(escalation.time_slot)}:00`).toISOString()
+      const medIds = (escalation.medication_ids as string[]) || []
 
-    // Alert caregiver
-    const { data: alerts } = await supabase
-      .from('patient_alerts')
-      .select('phone, alert_sms')
-      .eq('patient_id', patient.id as string)
-      .eq('alert_sms', true)
+      for (const medId of medIds) {
+        try {
+          // Insert or update the unique row for (patient, med, scheduled_at)
+          const { error: upsertErr } = await supabase
+            .from('dose_logs')
+            .upsert(
+              {
+                patient_id: patient.id as string,
+                medication_id: medId,
+                scheduled_at: scheduledAtIso,
+                confirmed: false,
+                confirmed_at: null,
+                source: 'system',
+              } as any,
+              { onConflict: 'patient_id,medication_id,scheduled_at' }
+            )
 
-    const caregiverAlert = `⚠️ ${patient.name as string} has not confirmed taking their medications today. You may want to check in.`
-
-    for (const alert of alerts || []) {
-      if (!alert.phone) continue
-      try {
-        await twilioClient.messages.create({
-          to: alert.phone as string,
-          from: process.env.TWILIO_PHONE_NUMBER!,
-          body: caregiverAlert,
-        })
-      } catch (e: unknown) {
-        console.error('[advance] Caregiver alert failed:', e)
+          if (upsertErr) {
+            console.error('[advance] dose_logs upsert missed failed:', upsertErr)
+          }
+        } catch (e) {
+          console.error('[advance] dose_logs missed write failed:', e)
+        }
       }
-    }
 
-    await adminLogEvent({
-      patientId: patient.id as string,
-      ownerId: patient.owner_id as string,
-      eventType: 'missed_dose',
-      patientName: patient.name as string,
-      internalDetails: { escalationId, step: 6, caregiverAlerts: (alerts || []).length },
-    })
-    return { advanced: true }
+      // Alert caregiver (best-effort; SMS may be filtered until A2P is approved)
+      const { data: alerts } = await supabase
+        .from('patient_alerts')
+        .select('phone, alert_sms')
+        .eq('patient_id', patient.id as string)
+        .eq('alert_sms', true)
+
+      const caregiverAlert = `⚠️ ${patient.name as string} has not confirmed taking their medications for ${String(escalation.time_slot)}. You may want to check in.`
+
+      for (const alert of alerts || []) {
+        if (!alert.phone) continue
+        try {
+          await twilioClient.messages.create({
+            to: alert.phone as string,
+            from: process.env.TWILIO_PHONE_NUMBER!,
+            body: caregiverAlert,
+          })
+        } catch (e: unknown) {
+          console.error('[advance] Caregiver alert failed:', e)
+        }
+      }
+
+      await adminLogEvent({
+        patientId: patient.id as string,
+        ownerId: patient.owner_id as string,
+        eventType: 'missed_dose',
+        patientName: patient.name as string,
+        internalDetails: {
+          escalationId,
+          step: 6,
+          timeSlot: escalation.time_slot,
+          minsPast,
+          caregiverAlerts: (alerts || []).length,
+          note: 'finalized at 2h past scheduled slot',
+        },
+      })
+
+      return { advanced: true }
+    }
   }
 
   return { advanced: false, reason: 'no_transition' }
