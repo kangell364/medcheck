@@ -16,6 +16,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { localDateTimeToUtcIso } from '@/lib/time/localToUtc'
 
 export async function POST(request: NextRequest) {
   try {
@@ -35,9 +36,19 @@ export async function POST(request: NextRequest) {
     }
 
     const dateStr = new Date().toLocaleDateString('en-CA', { timeZone: patientTimezone })
-    const scheduledSlotLocal = `${dateStr}T${scheduledTime}:00`
-    const scheduledSlotIso = new Date(scheduledSlotLocal).toISOString()
-    const takenAtIso = new Date(`${dateStr}T${takenTime}:00`).toISOString()
+
+    // Convert patient-local wall times into true UTC instants.
+    const scheduledSlotIso = localDateTimeToUtcIso({
+      date: dateStr,
+      time: scheduledTime,
+      timezone: patientTimezone,
+    })
+
+    const takenAtIso = localDateTimeToUtcIso({
+      date: dateStr,
+      time: takenTime,
+      timezone: patientTimezone,
+    })
 
     const supabase = createAdminClient()
 
