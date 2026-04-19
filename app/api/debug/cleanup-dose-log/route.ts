@@ -25,8 +25,8 @@ export async function GET(request: NextRequest) {
   const slotIso = localDateTimeToUtcIso({ date: dateStr, time: scheduledTime, timezone })
 
   const slotMs = new Date(slotIso).getTime()
-  const winStart = new Date(slotMs - 8 * 60 * 60 * 1000).toISOString()
-  const winEnd = new Date(slotMs + 8 * 60 * 60 * 1000).toISOString()
+  const winStart = new Date(slotMs - 16 * 60 * 60 * 1000).toISOString()
+  const winEnd = new Date(slotMs + 16 * 60 * 60 * 1000).toISOString()
 
   const { data: nearby, error } = await supabase
     .from('dose_logs')
@@ -51,6 +51,8 @@ export async function GET(request: NextRequest) {
     timezone,
     date: dateStr,
     keepScheduledAt: keep,
+    window: { start: winStart, end: winEnd },
+    nearby: nearby || [],
     deletedIds: toDelete,
     nearbyCount: (nearby || []).length,
   })
