@@ -18,14 +18,19 @@ import { adminLogEvent } from '@/lib/logEvent'
 
 const VoiceResponse = twilio.twiml.VoiceResponse
 
-function normIntent(digits: string | null, speech: string | null): 'yes' | 'no' | 'some' | null {
+function normIntent(digits: string | null, speech: string | null): 'yes' | 'no' | 'some' | 'repeat' | null {
   const raw = (digits || speech || '').trim().toUpperCase()
   if (!raw) return null
 
+  // DTMF
   if (raw === '1') return 'yes'
   if (raw === '2') return 'no'
   if (raw === '3') return 'some'
 
+  // Interrupts / clarifications
+  if (/(WHAT|REPEAT|SAY AGAIN|CAN\s?T HEAR|CANT HEAR|WHO IS THIS|WHY ARE YOU CALLING)/.test(raw)) return 'repeat'
+
+  // Speech intents
   if (['YES', 'YEAH', 'YEP', 'YUP', 'TAKEN', 'TOOK', 'DONE'].includes(raw)) return 'yes'
   if (['NO', 'NOPE', 'NOT', 'NOT YET', 'HAVENT', "HAVEN'T"].includes(raw)) return 'no'
   if (['SOME', 'PARTIAL', 'A FEW'].includes(raw)) return 'some'
@@ -74,8 +79,19 @@ export async function POST(request: NextRequest) {
   }
 
   if (!intent) {
-    twiml.say({ voice: 'Polly.Joanna' }, "Sorry, I didn't catch that. We'll send you a text message instead. Goodbye.")
-    twiml.hangup()
+    // Let the reprompt in the main TwiML handle the second try. If this is already try=2,
+    // we fall back to the SMS path.
+    twiml.redirect({ method: 'POST' }, `/api/calls/remind/twiml-gather?escalationId=${encodeURIComponent(escalationId)}`)
+    return new NextResponse(twiml.toString(), { headers: { 'Content-Type': 'text/xml' } })
+  }
+
+  if (intent === 'repeat') {
+    twiml.say(
+      { voice: 'Polly.Joanna' },
+      "Of course. This is RxNudge calling to help you log your medications. " +
+        'Please say yes, no, or some. Or press 1 for yes, 2 for no, or 3 for some.'
+    )
+    twiml.redirect({ method: 'POST' }, `/api/calls/remind/twiml-gather?escalationId=${encodeURIComponent(escalationId)}`)
     return new NextResponse(twiml.toString(), { headers: { 'Content-Type': 'text/xml' } })
   }
 

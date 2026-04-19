@@ -48,17 +48,42 @@ function handler(request: NextRequest): NextResponse {
     speechTimeout: 'auto',
     action: `/api/calls/remind/twiml-gather/result?escalationId=${encodeURIComponent(escalationId)}`,
     method: 'POST',
-    timeout: 6,
+    timeout: 8,
   })
 
+  // Speech-first, keypad secondary.
   gather.say(
     { voice: 'Polly.Joanna' },
-    'Hi. This is RxNudge calling to help you log your medications. ' +
-      'Press 1 for yes, 2 for no, 3 for some. Or say yes, no, or some.'
+    "Hi. This is RxNudge. I'm calling to help you log your medications." 
+  )
+  gather.pause({ length: 1 })
+  gather.say(
+    { voice: 'Polly.Joanna' },
+    'Did you take your medications? You can say: yes, no, or some.'
+  )
+  gather.pause({ length: 1 })
+  gather.say(
+    { voice: 'Polly.Joanna' },
+    'If it is easier, you can press 1 for yes, 2 for no, or 3 for some.'
   )
 
-  // No input fallback
-  twiml.say({ voice: 'Polly.Joanna' }, "Sorry, I didn't catch that. We'll send you a text message instead. Goodbye.")
+  // No input fallback: reprompt once instead of hanging up immediately.
+  const reprompt = twiml.gather({
+    input: ['speech', 'dtmf'],
+    numDigits: 1,
+    speechTimeout: 'auto',
+    action: `/api/calls/remind/twiml-gather/result?escalationId=${encodeURIComponent(escalationId)}&try=2`,
+    method: 'POST',
+    timeout: 8,
+  })
+
+  reprompt.say(
+    { voice: 'Polly.Joanna' },
+    "Sorry — I didn't catch that. Please say yes, no, or some. " +
+      'Or press 1 for yes, 2 for no, or 3 for some.'
+  )
+
+  twiml.say({ voice: 'Polly.Joanna' }, "No worries. We'll send you a text message instead. Goodbye.")
   twiml.hangup()
 
   return new NextResponse(twiml.toString(), { headers: { 'Content-Type': 'text/xml' } })
