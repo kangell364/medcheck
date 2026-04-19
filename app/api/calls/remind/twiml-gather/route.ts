@@ -52,18 +52,20 @@ function handler(request: NextRequest): NextResponse {
   })
 
   // Speech-first, keypad secondary.
+  const VOICE = process.env.TWILIO_VOICE || 'Polly.Joanna'
+
   gather.say(
-    { voice: 'Polly.Joanna' },
+    { voice: VOICE },
     "Hi. This is RxNudge. I'm calling to help you log your medications." 
   )
   gather.pause({ length: 1 })
   gather.say(
-    { voice: 'Polly.Joanna' },
+    { voice: VOICE },
     'Did you take your medications? You can say: yes, no, or some.'
   )
   gather.pause({ length: 1 })
   gather.say(
-    { voice: 'Polly.Joanna' },
+    { voice: VOICE },
     'If it is easier, you can press 1 for yes, 2 for no, or 3 for some.'
   )
 
@@ -78,12 +80,12 @@ function handler(request: NextRequest): NextResponse {
   })
 
   reprompt.say(
-    { voice: 'Polly.Joanna' },
+    { voice: VOICE },
     "Sorry — I didn't catch that. Please say yes, no, or some. " +
       'Or press 1 for yes, 2 for no, or 3 for some.'
   )
 
-  twiml.say({ voice: 'Polly.Joanna' }, "No worries. We'll send you a text message instead. Goodbye.")
+  twiml.say({ voice: VOICE }, "No worries. We'll send you a text message instead. Goodbye.")
   twiml.hangup()
 
   return new NextResponse(twiml.toString(), { headers: { 'Content-Type': 'text/xml' } })

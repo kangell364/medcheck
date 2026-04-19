@@ -50,8 +50,10 @@ export async function POST(request: NextRequest) {
 
   const intent = normIntent(digits, speech)
 
+  const VOICE = process.env.TWILIO_VOICE || 'Polly.Joanna'
+
   if (!escalationId) {
-    twiml.say({ voice: 'Polly.Joanna' }, 'Sorry, there was an error. Goodbye.')
+    twiml.say({ voice: VOICE }, 'Sorry, there was an error. Goodbye.')
     twiml.hangup()
     return new NextResponse(twiml.toString(), { headers: { 'Content-Type': 'text/xml' } })
   }
@@ -87,7 +89,7 @@ export async function POST(request: NextRequest) {
 
   if (intent === 'repeat') {
     twiml.say(
-      { voice: 'Polly.Joanna' },
+      { voice: VOICE },
       "Of course. This is RxNudge calling to help you log your medications. " +
         'Please say yes, no, or some. Or press 1 for yes, 2 for no, or 3 for some.'
     )
@@ -96,7 +98,7 @@ export async function POST(request: NextRequest) {
   }
 
   if (intent === 'yes') {
-    twiml.say({ voice: 'Polly.Joanna' }, 'Great. Thank you. I have logged that as taken. Goodbye.')
+    twiml.say({ voice: VOICE }, 'Great. Thank you. I have logged that as taken. Goodbye.')
     twiml.hangup()
     // Mark escalation confirmed for now. Detailed per-slot dose log updates will come next.
     await supabase
@@ -104,7 +106,7 @@ export async function POST(request: NextRequest) {
       .update({ status: 'confirmed', confirmed_at: new Date().toISOString() })
       .eq('id', escalationId)
   } else if (intent === 'no') {
-    twiml.say({ voice: 'Polly.Joanna' }, 'Okay. Thank you. I will send you a text so you can reply later. Goodbye.')
+    twiml.say({ voice: VOICE }, 'Okay. Thank you. I will send you a text so you can reply later. Goodbye.')
     twiml.hangup()
     await supabase
       .from('reminder_escalations')
@@ -112,7 +114,7 @@ export async function POST(request: NextRequest) {
       .eq('id', escalationId)
   } else {
     // SOME
-    twiml.say({ voice: 'Polly.Joanna' }, "Okay. Let's go through them one by one. We'll continue by text for now. Goodbye.")
+    twiml.say({ voice: VOICE }, "Okay. Let's go through them one by one. We'll continue by text for now. Goodbye.")
     twiml.hangup()
     await supabase
       .from('reminder_escalations')
