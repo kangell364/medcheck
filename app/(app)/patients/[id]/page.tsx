@@ -113,7 +113,7 @@ export default async function PatientDetailPage({
                 ✏️ Edit
               </Link>
             </div>
-            <p className="text-gray-500">{patient.phone} • {patient.timezone}</p>
+            <p className="text-gray-500">{patient.phone} • {patient.timezone?.replace('Chicago', 'Central')}</p>
           </div>
           <div className="flex items-center gap-3">
             <SendLoginLinkButton
