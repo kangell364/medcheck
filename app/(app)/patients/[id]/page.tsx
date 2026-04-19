@@ -47,9 +47,34 @@ export default async function PatientDetailPage({
   const tz = patient.timezone || 'America/Chicago'
   const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: tz })
 
-  // Compute UTC bounds for the patient's local day.
-  const startOfDayUtc = new Date(`${todayStr}T00:00:00`).toISOString()
-  const endOfDayUtc = new Date(`${todayStr}T23:59:59.999`).toISOString()
+  const utcForLocal = (d: string, hhmmss: string) => {
+    // Seed with a UTC time, then read what that moment is in the target timezone.
+    // This is approximate but consistent for day-boundaries.
+    const approx = new Date(`${d}T${hhmmss}Z`)
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: tz,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false,
+    }).formatToParts(approx)
+
+    const get = (t: string) => parts.find(p => p.type === t)?.value
+    const y = get('year')
+    const mo = get('month')
+    const da = get('day')
+    const h = get('hour')
+    const mi = get('minute')
+    const s = get('second')
+
+    return new Date(`${y}-${mo}-${da}T${h}:${mi}:${s}.000Z`).toISOString()
+  }
+
+  const startOfDayUtc = utcForLocal(todayStr, '00:00:00')
+  const endOfDayUtc = utcForLocal(todayStr, '23:59:59')
 
   const { data: todayLogs } = await supabase
     .from('dose_logs')
