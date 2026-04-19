@@ -42,17 +42,21 @@ export default async function PatientDetailPage({
     .not('archived_at', 'is', null)
     .order('created_at') as { data: Medication[] | null }
 
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  const tomorrow = new Date(today)
-  tomorrow.setDate(tomorrow.getDate() + 1)
+  // Use the patient's timezone day window (not server UTC midnight) so manual logs
+  // always appear in "Today's Medications" and the calendar.
+  const tz = patient.timezone || 'America/Chicago'
+  const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: tz })
+
+  // Compute UTC bounds for the patient's local day.
+  const startOfDayUtc = new Date(`${todayStr}T00:00:00`).toISOString()
+  const endOfDayUtc = new Date(`${todayStr}T23:59:59.999`).toISOString()
 
   const { data: todayLogs } = await supabase
     .from('dose_logs')
     .select('*')
     .eq('patient_id', id)
-    .gte('scheduled_at', today.toISOString())
-    .lt('scheduled_at', tomorrow.toISOString()) as { data: DoseLog[] | null }
+    .gte('scheduled_at', startOfDayUtc)
+    .lte('scheduled_at', endOfDayUtc) as { data: DoseLog[] | null }
 
   const { data: alerts } = await supabase
     .from('patient_alerts')
