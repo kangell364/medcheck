@@ -34,3 +34,12 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+
+---
+
+## Other applications in this repository
+
+- **[`texas-exam-prep/`](./texas-exam-prep)** — Texas Insurance Exam Prep
+  Platform (Phase 1). A separate Next.js application with its own dependencies,
+  Supabase project and migration history. See
+  [`texas-exam-prep/README.md`](./texas-exam-prep/README.md) for setup.
