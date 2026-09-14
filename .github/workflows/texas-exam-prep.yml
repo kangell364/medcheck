@@ -1,0 +1,138 @@
+name: texas-exam-prep
+
+# Scoped deliberately to the texas-exam-prep/ subdirectory.
+#
+# This repository also contains the unrelated `medcheck` application at its
+# root. The path filters below mean a commit that touches only medcheck never
+# triggers this workflow, so it costs nothing and cannot report a misleading
+# failure against work it knows nothing about.
+on:
+  push:
+    paths:
+      - 'texas-exam-prep/**'
+      - '.github/workflows/texas-exam-prep.yml'
+  pull_request:
+    paths:
+      - 'texas-exam-prep/**'
+      - '.github/workflows/texas-exam-prep.yml'
+  # Allows a manual run from the Actions tab.
+  workflow_dispatch:
+
+# A new push supersedes an in-flight run for the same ref.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    working-directory: texas-exam-prep
+
+jobs:
+  app:
+    name: Lint, types, tests, build
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: texas-exam-prep/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Type check
+        run: npm run typecheck
+
+      - name: Unit and component tests
+        run: npm test
+
+      # No Supabase credentials are provided, and none are needed: the build
+      # must succeed without them. `lib/env.ts` reports missing configuration
+      # rather than throwing, and the pages render their "not configured"
+      # state. A build that only passes when secrets are present would hide
+      # exactly that behaviour.
+      - name: Production build
+        run: npm run build
+
+  database:
+    name: Database schema and RLS policies
+    runs-on: ubuntu-latest
+
+    # A real PostgreSQL server. The migrations are applied to it from scratch
+    # and the RLS assertions run as an unprivileged `authenticated` connection,
+    # which is the only way to prove the security policies actually hold.
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_USER: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      PGHOST: localhost
+      PGPORT: '5432'
+      PGUSER: postgres
+      PGPASSWORD: postgres
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install the PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends postgresql-client
+
+      # Applies the Supabase compatibility shim, then every migration in order,
+      # then the seed, then the assertions. Any failed assertion aborts with a
+      # non-zero exit code.
+      #
+      # This is the check that matters most in this repository: it is what
+      # proves a student cannot read another student's profile or enrollments,
+      # cannot see draft courses, cannot self-enroll, and cannot promote
+      # themselves to admin.
+      - name: Apply migrations and run RLS assertions
+        run: ./scripts/test-rls-local.sh
+
+      # A guard against the specific mistake that made the immutability trigger
+      # a no-op: SECURITY DEFINER rebinds current_user to the function owner,
+      # so a trusted-role allow-list keyed on current_user matches every
+      # caller. The assertions above cover this too; this is a cheap, explicit
+      # second signal that names the failure directly.
+      - name: Assert the immutability trigger is SECURITY INVOKER
+        run: |
+          psql -v ON_ERROR_STOP=1 -d postgres \
+            -c "drop database if exists ci_secdef_check;" \
+            -c "create database ci_secdef_check;"
+          psql -q -v ON_ERROR_STOP=1 -d ci_secdef_check \
+            -f supabase/tests/local/00_supabase_shim.sql
+          for migration in supabase/migrations/*.sql; do
+            psql -q -v ON_ERROR_STOP=1 -d ci_secdef_check -f "$migration"
+          done
+          secdef=$(psql -tA -d ci_secdef_check -c \
+            "select prosecdef from pg_proc where proname = 'enforce_profile_immutable_columns';")
+          echo "enforce_profile_immutable_columns prosecdef = '${secdef}'"
+          # An empty result means the function is absent or the query failed —
+          # report that distinctly rather than as a security regression.
+          if [ -z "${secdef}" ]; then
+            echo "::error::Could not read prosecdef for enforce_profile_immutable_columns. The function is missing, or the migrations did not apply."
+            exit 1
+          fi
+          if [ "${secdef}" != "f" ]; then
+            echo "::error file=texas-exam-prep/supabase/migrations/20260101000400_authorization_helpers.sql::enforce_profile_immutable_columns() must be SECURITY INVOKER. As SECURITY DEFINER, current_user becomes the function owner, its trusted-role allow-list matches every caller, and every immutability check below it is skipped."
+            exit 1
+          fi
