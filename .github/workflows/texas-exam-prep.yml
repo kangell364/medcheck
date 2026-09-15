@@ -73,6 +73,14 @@ jobs:
       - name: Statute extractor assertions
         run: python3 scripts/test-extract-statute.py
 
+      # supabase/deploy/phase-2-schema.sql is the concatenated migration file
+      # somebody pastes into the Supabase SQL editor when the CLI is not
+      # available. A generated file that has drifted from its source is worse
+      # than no generated file: it gets pasted into production in the belief
+      # that it matches the migrations. --check writes nothing.
+      - name: Deploy SQL is up to date
+        run: node scripts/build-deploy-sql.mjs --check
+
       # No Supabase credentials are provided, and none are needed: the build
       # must succeed without them. `lib/env.ts` reports missing configuration
       # rather than throwing, and the pages render their "not configured"
