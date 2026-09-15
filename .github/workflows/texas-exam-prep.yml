@@ -63,6 +63,16 @@ jobs:
       - name: Validate lesson content
         run: node scripts/import-content.mjs --check
 
+      # The statute extractor's text cleanup, tested directly. The PDFs from
+      # statutes.capitol.texas.gov render non-breaking spaces as a literal
+      # capital "A", which collides with the article "A" that opens most
+      # subsections in the Insurance Code. An earlier rule deleted 35 of those
+      # articles silently -- the output still read as fluent English, just with
+      # "A person may not acquire..." reduced to "person may not acquire...".
+      # Nothing tested the transform, so nothing caught it.
+      - name: Statute extractor assertions
+        run: python3 scripts/test-extract-statute.py
+
       # No Supabase credentials are provided, and none are needed: the build
       # must succeed without them. `lib/env.ts` reports missing configuration
       # rather than throwing, and the pages render their "not configured"
