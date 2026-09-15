@@ -113,7 +113,7 @@ jobs:
       # so a trusted-role allow-list keyed on current_user matches every
       # caller. The assertions above cover this too; this is a cheap, explicit
       # second signal that names the failure directly.
-      - name: Assert the immutability trigger is SECURITY INVOKER
+      - name: Assert every function that should be SECURITY INVOKER still is
         run: |
           psql -v ON_ERROR_STOP=1 -d postgres \
             -c "drop database if exists ci_secdef_check;" \
@@ -123,16 +123,44 @@ jobs:
           for migration in supabase/migrations/*.sql; do
             psql -q -v ON_ERROR_STOP=1 -d ci_secdef_check -f "$migration"
           done
-          secdef=$(psql -tA -d ci_secdef_check -c \
-            "select prosecdef from pg_proc where proname = 'enforce_profile_immutable_columns';")
-          echo "enforce_profile_immutable_columns prosecdef = '${secdef}'"
-          # An empty result means the function is absent or the query failed —
-          # report that distinctly rather than as a security regression.
-          if [ -z "${secdef}" ]; then
-            echo "::error::Could not read prosecdef for enforce_profile_immutable_columns. The function is missing, or the migrations did not apply."
-            exit 1
+
+          # Every function here must run with the CALLER's privileges.
+          #
+          # SECURITY DEFINER is not a stronger setting, it is a different one,
+          # and the project has already been bitten by treating it as a default:
+          # enforce_profile_immutable_columns() was declared DEFINER, which
+          # rebinds current_user to the function owner, so its trusted-role
+          # allow-list matched every caller and every check below it was
+          # skipped. The trigger was a no-op and the whole suite still passed.
+          #
+          # public.is_admin() is the one deliberate SECURITY DEFINER in the
+          # schema — it must be, to break RLS recursion on profiles — and is
+          # therefore absent from this list.
+          invoker_only="enforce_profile_immutable_columns enforce_topic_depth is_enrolled_in_course lesson_is_published"
+          failed=0
+          for fn in $invoker_only; do
+            secdef=$(psql -tA -d ci_secdef_check -c \
+              "select prosecdef from pg_proc where proname = '${fn}';")
+            echo "${fn} prosecdef = '${secdef}'"
+            # An empty result means the function is absent or the query failed —
+            # report that distinctly rather than as a security regression.
+            if [ -z "${secdef}" ]; then
+              echo "::error::Could not read prosecdef for ${fn}. The function is missing, or the migrations did not apply."
+              failed=1
+            elif [ "${secdef}" != "f" ]; then
+              echo "::error::${fn}() must be SECURITY INVOKER. As SECURITY DEFINER, current_user becomes the function owner, so any role check inside it matches every caller and the privileges it borrows are the owner's, not the caller's."
+              failed=1
+            fi
+          done
+
+          # The converse: is_admin() must STAY security definer, or the policies
+          # that call it recurse into the profiles policy that calls it.
+          isadmin=$(psql -tA -d ci_secdef_check -c \
+            "select prosecdef from pg_proc where proname = 'is_admin';")
+          echo "is_admin prosecdef = '${isadmin}'"
+          if [ "${isadmin}" != "t" ]; then
+            echo "::error file=texas-exam-prep/supabase/migrations/20260101000400_authorization_helpers.sql::is_admin() must remain SECURITY DEFINER; as INVOKER the profiles policies recurse."
+            failed=1
           fi
-          if [ "${secdef}" != "f" ]; then
-            echo "::error file=texas-exam-prep/supabase/migrations/20260101000400_authorization_helpers.sql::enforce_profile_immutable_columns() must be SECURITY INVOKER. As SECURITY DEFINER, current_user becomes the function owner, its trusted-role allow-list matches every caller, and every immutability check below it is skipped."
-            exit 1
-          fi
+
+          exit $failed
