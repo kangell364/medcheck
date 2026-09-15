@@ -53,6 +53,16 @@ jobs:
       - name: Unit and component tests
         run: npm test
 
+      # Parses every lesson in content/ and fails on a malformed one: missing
+      # front matter, no body, a module directory without its ordering prefix.
+      # It also prints how many lessons are still UNREVIEWED, which is the
+      # number that should be going down.
+      #
+      # --check writes nothing. Regenerating supabase/seed_content.sql is a
+      # deliberate act by whoever edited the lesson, not a side effect of CI.
+      - name: Validate lesson content
+        run: node scripts/import-content.mjs --check
+
       # No Supabase credentials are provided, and none are needed: the build
       # must succeed without them. `lib/env.ts` reports missing configuration
       # rather than throwing, and the pages render their "not configured"
