@@ -1,0 +1,14 @@
+# The texas-exam-prep/ directory is a SEPARATE Next.js application with its own
+# package.json, its own dependencies and its own CI workflow. It is not part of
+# this app and must not be uploaded to or built by this project's deployment.
+#
+# Without this, Vercel's build type-checks the whole repository against THIS
+# app's tsconfig, where the `@/*` path alias points at the repository root.
+# Every `@/components/...` import inside texas-exam-prep then resolves to a
+# path that does not exist here, and the build fails with a few hundred
+# "cannot find module" errors that have nothing to do with this application.
+#
+# tsconfig.json excludes the directory as well. Both are needed: the tsconfig
+# exclude is what fixes the type check, and this file stops the source being
+# uploaded at all.
+texas-exam-prep
